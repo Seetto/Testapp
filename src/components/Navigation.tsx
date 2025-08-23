@@ -97,32 +97,71 @@ export default function Navigation() {
   }
 
   return (
-    <nav className="bg-white dark:bg-gray-900 shadow-sm border-b border-gray-200 dark:border-gray-700">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Mobile Navigation - Show by default, hide on larger screens */}
-        <div className="block lg:hidden">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex-shrink-0">
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-                My App
-              </h1>
+    <>
+      {/* Simplified Navigation - Only navigation links */}
+      <nav className="bg-white dark:bg-gray-900 shadow-sm border-b border-gray-200 dark:border-gray-700">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Mobile Navigation */}
+          <div className="block lg:hidden">
+            <div className="flex justify-between items-center h-16">
+              <div className="flex-shrink-0">
+                <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+                  My App
+                </h1>
+              </div>
+              <button
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                className="text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white p-2 rounded-md transition-colors"
+              >
+                {isMobileMenuOpen ? <CloseIcon /> : <MenuIcon />}
+              </button>
             </div>
-            <button
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white p-2 rounded-md transition-colors"
-            >
-              {isMobileMenuOpen ? <CloseIcon /> : <MenuIcon />}
-            </button>
+
+            {/* Mobile Menu - Only navigation links */}
+            {isMobileMenuOpen && (
+              <div className="absolute top-16 left-0 right-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 shadow-lg z-50">
+                <div className="px-4 py-2 space-y-1">
+                  <Link
+                    href="/auth/success"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className={`flex items-center space-x-2 px-3 py-3 rounded-md text-sm font-medium transition-colors block ${
+                      pathname === '/auth/success'
+                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                        : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800'
+                    }`}
+                  >
+                    <HomeIcon />
+                    <span>Home</span>
+                  </Link>
+                  <Link
+                    href="/calendar"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className={`flex items-center space-x-2 px-3 py-3 rounded-md text-sm font-medium transition-colors block ${
+                      pathname === '/calendar'
+                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                        : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800'
+                    }`}
+                  >
+                    <CalendarIcon />
+                    <span>Calendar</span>
+                  </Link>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Mobile Menu */}
-          {isMobileMenuOpen && (
-            <div className="absolute top-16 left-0 right-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 shadow-lg z-50">
-              <div className="px-4 py-2 space-y-1">
+          {/* Desktop Navigation - Only navigation links */}
+          <div className="hidden lg:flex justify-between h-16">
+            <div className="flex items-center space-x-8">
+              <div className="flex-shrink-0">
+                <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+                  My App
+                </h1>
+              </div>
+              <div className="flex space-x-4">
                 <Link
                   href="/auth/success"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className={`flex items-center space-x-2 px-3 py-3 rounded-md text-sm font-medium transition-colors block ${
+                  className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                     pathname === '/auth/success'
                       ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
                       : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800'
@@ -133,8 +172,7 @@ export default function Navigation() {
                 </Link>
                 <Link
                   href="/calendar"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className={`flex items-center space-x-2 px-3 py-3 rounded-md text-sm font-medium transition-colors block ${
+                  className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                     pathname === '/calendar'
                       ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
                       : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800'
@@ -144,86 +182,32 @@ export default function Navigation() {
                   <span>Calendar</span>
                 </Link>
               </div>
-
-              {/* User Info and Sign Out at Bottom of Mobile Menu */}
-              <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-4">
-                <div className="flex flex-col space-y-3">
-                  <div className="flex flex-col space-y-1">
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">
-                      {session.user?.name}
-                    </span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                      {session.user?.email}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setIsMobileMenuOpen(false)
-                      signOut()
-                    }}
-                    className="flex justify-center w-full text-sm text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 transition-colors px-3 py-2 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 border border-red-200 dark:border-red-800"
-                  >
-                    Sign out
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Desktop Navigation - Hide by default, show on large screens */}
-        <div className="hidden lg:flex justify-between h-16">
-          <div className="flex items-center space-x-8">
-            <div className="flex-shrink-0">
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-                My App
-              </h1>
-            </div>
-            <div className="flex space-x-4">
-              <Link
-                href="/auth/success"
-                className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  pathname === '/auth/success'
-                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                    : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800'
-                }`}
-              >
-                <HomeIcon />
-                <span>Home</span>
-              </Link>
-              <Link
-                href="/calendar"
-                className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  pathname === '/calendar'
-                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                    : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800'
-                }`}
-              >
-                <CalendarIcon />
-                <span>Calendar</span>
-              </Link>
             </div>
           </div>
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-3">
-              <div className="flex flex-col">
-                <span className="text-sm font-medium text-gray-900 dark:text-white">
-                  {session.user?.name}
-                </span>
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  {session.user?.email}
-                </span>
-              </div>
-              <button
-                onClick={() => signOut()}
-                className="text-sm text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 transition-colors px-3 py-1 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20"
-              >
-                Sign out
-              </button>
+        </div>
+      </nav>
+
+      {/* Fixed Footer with User Info and Sign Out */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 shadow-lg z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col">
+              <span className="text-sm font-medium text-gray-900 dark:text-white">
+                {session.user?.name}
+              </span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                {session.user?.email}
+              </span>
             </div>
+            <button
+              onClick={() => signOut()}
+              className="text-sm text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 transition-colors px-4 py-2 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 border border-red-200 dark:border-red-800"
+            >
+              Sign out
+            </button>
           </div>
         </div>
       </div>
-    </nav>
+    </>
   )
 }

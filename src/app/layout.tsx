@@ -39,7 +39,9 @@ export default function RootLayout({
         <Providers>
           <BouncingBalls ballCount={8} />
           <Navigation />
-          {children}
+          <main className="pb-20">
+            {children}
+          </main>
         </Providers>
       </body>
     </html>
