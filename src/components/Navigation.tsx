@@ -98,70 +98,31 @@ export default function Navigation() {
 
   return (
     <>
-      {/* Simplified Navigation - Only navigation links */}
+      {/* Always use hamburger menu navigation - no user info in navbar */}
       <nav className="bg-white dark:bg-gray-900 shadow-sm border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Mobile Navigation */}
-          <div className="block lg:hidden">
-            <div className="flex justify-between items-center h-16">
-              <div className="flex-shrink-0">
-                <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-                  My App
-                </h1>
-              </div>
-              <button
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white p-2 rounded-md transition-colors"
-              >
-                {isMobileMenuOpen ? <CloseIcon /> : <MenuIcon />}
-              </button>
+          <div className="flex justify-between items-center h-16">
+            <div className="flex-shrink-0">
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+                My App
+              </h1>
             </div>
-
-            {/* Mobile Menu - Only navigation links */}
-            {isMobileMenuOpen && (
-              <div className="absolute top-16 left-0 right-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 shadow-lg z-50">
-                <div className="px-4 py-2 space-y-1">
-                  <Link
-                    href="/auth/success"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className={`flex items-center space-x-2 px-3 py-3 rounded-md text-sm font-medium transition-colors block ${
-                      pathname === '/auth/success'
-                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                        : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800'
-                    }`}
-                  >
-                    <HomeIcon />
-                    <span>Home</span>
-                  </Link>
-                  <Link
-                    href="/calendar"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className={`flex items-center space-x-2 px-3 py-3 rounded-md text-sm font-medium transition-colors block ${
-                      pathname === '/calendar'
-                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                        : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800'
-                    }`}
-                  >
-                    <CalendarIcon />
-                    <span>Calendar</span>
-                  </Link>
-                </div>
-              </div>
-            )}
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white p-2 rounded-md transition-colors"
+            >
+              {isMobileMenuOpen ? <CloseIcon /> : <MenuIcon />}
+            </button>
           </div>
 
-          {/* Desktop Navigation - Only navigation links */}
-          <div className="hidden lg:flex justify-between h-16">
-            <div className="flex items-center space-x-8">
-              <div className="flex-shrink-0">
-                <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-                  My App
-                </h1>
-              </div>
-              <div className="flex space-x-4">
+          {/* Dropdown Menu - Only navigation links */}
+          {isMobileMenuOpen && (
+            <div className="absolute top-16 left-0 right-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 shadow-lg z-50">
+              <div className="px-4 py-2 space-y-1">
                 <Link
                   href="/auth/success"
-                  className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={`flex items-center space-x-2 px-3 py-3 rounded-md text-sm font-medium transition-colors block ${
                     pathname === '/auth/success'
                       ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
                       : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800'
@@ -172,7 +133,8 @@ export default function Navigation() {
                 </Link>
                 <Link
                   href="/calendar"
-                  className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={`flex items-center space-x-2 px-3 py-3 rounded-md text-sm font-medium transition-colors block ${
                     pathname === '/calendar'
                       ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
                       : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800'
@@ -183,7 +145,7 @@ export default function Navigation() {
                 </Link>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </nav>
 
