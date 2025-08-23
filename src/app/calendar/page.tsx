@@ -3,6 +3,11 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { redirect } from 'next/navigation'
+import { Session } from 'next-auth'
+
+interface ExtendedSession extends Session {
+  accessToken?: string
+}
 
 interface CalendarEvent {
   id: string
@@ -35,7 +40,7 @@ export default function CalendarPage() {
   }, [status])
 
   useEffect(() => {
-    if (session?.accessToken) {
+    if ((session as ExtendedSession)?.accessToken) {
       fetchCalendarEvents()
     }
   }, [session])
@@ -245,7 +250,7 @@ export default function CalendarPage() {
             </svg>
             <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No events found</h3>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              You don't have any upcoming events in the next 30 days.
+              You don&apos;t have any upcoming events in the next 30 days.
             </p>
           </div>
         )}

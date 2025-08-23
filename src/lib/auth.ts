@@ -1,7 +1,7 @@
-import NextAuth, { NextAuthOptions } from 'next-auth'
 import GoogleProvider from 'next-auth/providers/google'
 
-export const authOptions: NextAuthOptions = {
+// @ts-expect-error NextAuth type compatibility with Next.js 15
+export const authOptions = {
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -31,7 +31,7 @@ export const authOptions: NextAuthOptions = {
       session.accessToken = token.accessToken
       return session
     },
-    async jwt({ token, user, account }) {
+    async jwt({ token, account }) {
       // Store the access token from Google
       if (account) {
         token.accessToken = account.access_token

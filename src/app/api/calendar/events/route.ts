@@ -1,11 +1,16 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { google } from 'googleapis'
 import { authOptions } from '../../../../lib/auth'
+import { Session } from 'next-auth'
 
-export async function GET(request: NextRequest) {
+interface ExtendedSession extends Session {
+  accessToken?: string
+}
+
+export async function GET() {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getServerSession(authOptions) as ExtendedSession | null
     
     console.log('Session:', session ? 'exists' : 'null')
     console.log('Access token:', session?.accessToken ? 'exists' : 'missing')
@@ -43,18 +48,13 @@ export async function GET(request: NextRequest) {
     console.log(`Successfully fetched ${events.length} events`)
 
     return NextResponse.json({ events })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Calendar API error:', error)
-    console.error('Error details:', {
-      message: error.message,
-      code: error.code,
-      status: error.status,
-      response: error.response?.data
-    })
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     return NextResponse.json(
       { 
         error: 'Failed to fetch calendar events',
-        details: error.message 
+        details: errorMessage 
       },
       { status: 500 }
     )

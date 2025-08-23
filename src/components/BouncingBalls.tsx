@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 
 interface Ball {
   id: number;
@@ -22,7 +22,7 @@ const BouncingBalls: React.FC<BouncingBallsProps> = ({
   className = '' 
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animationRef = useRef<number>();
+  const animationRef = useRef<number | undefined>(undefined);
   const ballsRef = useRef<Ball[]>([]);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
@@ -43,7 +43,7 @@ const BouncingBalls: React.FC<BouncingBallsProps> = ({
   }, []);
 
   // Initialize balls
-  const initializeBalls = (canvas: HTMLCanvasElement) => {
+  const initializeBalls = useCallback((canvas: HTMLCanvasElement) => {
     const balls: Ball[] = [];
     const colors = isDarkMode 
       ? ['#ffffff20', '#ededed15', '#ffffff10', '#ededed25', '#ffffff18']
@@ -61,7 +61,7 @@ const BouncingBalls: React.FC<BouncingBallsProps> = ({
     }
 
     ballsRef.current = balls;
-  };
+  }, [ballCount, isDarkMode]);
 
   // Check collision between two balls
   const checkCollision = (ball1: Ball, ball2: Ball): boolean => {
@@ -112,7 +112,7 @@ const BouncingBalls: React.FC<BouncingBallsProps> = ({
   };
 
   // Update ball positions and handle collisions
-  const updateBalls = (canvas: HTMLCanvasElement) => {
+  const updateBalls = useCallback((canvas: HTMLCanvasElement) => {
     const balls = ballsRef.current;
 
     // Update positions
@@ -143,10 +143,10 @@ const BouncingBalls: React.FC<BouncingBallsProps> = ({
         }
       }
     }
-  };
+  }, []);
 
   // Draw balls on canvas
-  const drawBalls = (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => {
+  const drawBalls = useCallback((canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     ballsRef.current.forEach(ball => {
@@ -181,10 +181,10 @@ const BouncingBalls: React.FC<BouncingBallsProps> = ({
       ctx.lineWidth = 1;
       ctx.stroke();
     });
-  };
+  }, [isDarkMode]);
 
   // Animation loop
-  const animate = () => {
+  const animate = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -195,10 +195,10 @@ const BouncingBalls: React.FC<BouncingBallsProps> = ({
     drawBalls(canvas, ctx);
 
     animationRef.current = requestAnimationFrame(animate);
-  };
+  }, [updateBalls, drawBalls]);
 
   // Handle canvas resize
-  const handleResize = () => {
+  const handleResize = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -208,7 +208,7 @@ const BouncingBalls: React.FC<BouncingBallsProps> = ({
 
     // Reinitialize balls with new dimensions
     initializeBalls(canvas);
-  };
+  }, [initializeBalls]);
 
   useEffect(() => {
     if (!isMounted) return;
@@ -232,7 +232,7 @@ const BouncingBalls: React.FC<BouncingBallsProps> = ({
       }
       window.removeEventListener('resize', handleResize);
     };
-  }, [ballCount, isDarkMode, isMounted]);
+  }, [isMounted, initializeBalls, animate, handleResize]);
 
   // Don't render until mounted to prevent hydration mismatch
   if (!isMounted) {
