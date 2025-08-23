@@ -99,61 +99,8 @@ export default function Navigation() {
   return (
     <nav className="bg-white dark:bg-gray-900 shadow-sm border-b border-gray-200 dark:border-gray-700">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Desktop Navigation */}
-        <div className="hidden md:flex justify-between h-16">
-          <div className="flex items-center space-x-8">
-            <div className="flex-shrink-0">
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-                My App
-              </h1>
-            </div>
-            <div className="flex space-x-4">
-              <Link
-                href="/auth/success"
-                className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  pathname === '/auth/success'
-                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                    : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800'
-                }`}
-              >
-                <HomeIcon />
-                <span>Home</span>
-              </Link>
-              <Link
-                href="/calendar"
-                className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  pathname === '/calendar'
-                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                    : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800'
-                }`}
-              >
-                <CalendarIcon />
-                <span>Calendar</span>
-              </Link>
-            </div>
-          </div>
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-3">
-              <div className="flex flex-col">
-                <span className="text-sm font-medium text-gray-900 dark:text-white">
-                  {session.user?.name}
-                </span>
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  {session.user?.email}
-                </span>
-              </div>
-              <button
-                onClick={() => signOut()}
-                className="text-sm text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 transition-colors px-3 py-1 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20"
-              >
-                Sign out
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Mobile Navigation */}
-        <div className="md:hidden">
+        {/* Mobile Navigation - Show by default, hide on larger screens */}
+        <div className="block lg:hidden">
           <div className="flex justify-between items-center h-16">
             <div className="flex-shrink-0">
               <h1 className="text-xl font-bold text-gray-900 dark:text-white">
@@ -222,6 +169,59 @@ export default function Navigation() {
               </div>
             </div>
           )}
+        </div>
+
+        {/* Desktop Navigation - Hide by default, show on large screens */}
+        <div className="hidden lg:flex justify-between h-16">
+          <div className="flex items-center space-x-8">
+            <div className="flex-shrink-0">
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+                My App
+              </h1>
+            </div>
+            <div className="flex space-x-4">
+              <Link
+                href="/auth/success"
+                className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  pathname === '/auth/success'
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                    : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800'
+                }`}
+              >
+                <HomeIcon />
+                <span>Home</span>
+              </Link>
+              <Link
+                href="/calendar"
+                className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  pathname === '/calendar'
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                    : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800'
+                }`}
+              >
+                <CalendarIcon />
+                <span>Calendar</span>
+              </Link>
+            </div>
+          </div>
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3">
+              <div className="flex flex-col">
+                <span className="text-sm font-medium text-gray-900 dark:text-white">
+                  {session.user?.name}
+                </span>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {session.user?.email}
+                </span>
+              </div>
+              <button
+                onClick={() => signOut()}
+                className="text-sm text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 transition-colors px-3 py-1 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20"
+              >
+                Sign out
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </nav>
