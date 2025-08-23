@@ -232,8 +232,7 @@ const BouncingBalls: React.FC<BouncingBallsProps> = ({
       }
       window.removeEventListener('resize', handleResize);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMounted]);
+  }, [isMounted, animate, handleResize, initializeBalls]);
 
   // Don't render until mounted to prevent hydration mismatch
   if (!isMounted) {

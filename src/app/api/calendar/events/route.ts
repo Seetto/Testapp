@@ -8,6 +8,24 @@ interface ExtendedSession extends Session {
   accessToken?: string
 }
 
+interface CalendarEvent {
+  id: string
+  summary: string
+  description?: string
+  start: {
+    dateTime?: string
+    date?: string
+    timeZone?: string
+  }
+  end: {
+    dateTime?: string
+    date?: string
+    timeZone?: string
+  }
+  location?: string
+  htmlLink: string
+}
+
 export async function GET() {
   try {
     const session = await getServerSession(authOptions) as ExtendedSession | null
@@ -44,7 +62,7 @@ export async function GET() {
       orderBy: 'startTime',
     })
 
-    const events = (response.data.items as unknown[]) || []
+    const events = (response.data.items as CalendarEvent[]) || []
     console.log(`Successfully fetched ${events.length} events`)
 
     return NextResponse.json({ events })
