@@ -44,7 +44,7 @@ export async function GET() {
       orderBy: 'startTime',
     })
 
-    const events = response.data.items || []
+    const events = (response.data.items as unknown[]) || []
     console.log(`Successfully fetched ${events.length} events`)
 
     return NextResponse.json({ events })
