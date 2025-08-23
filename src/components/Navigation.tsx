@@ -97,8 +97,8 @@ export default function Navigation() {
   }
 
   return (
-    <>
-      {/* Always use hamburger menu navigation - no user info in navbar */}
+    <div>
+      {/* SIMPLE NAVBAR - ONLY NAVIGATION, NO USER INFO */}
       <nav className="bg-white dark:bg-gray-900 shadow-sm border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
@@ -115,7 +115,7 @@ export default function Navigation() {
             </button>
           </div>
 
-          {/* Dropdown Menu - Only navigation links */}
+          {/* DROPDOWN MENU - ONLY NAVIGATION LINKS */}
           {isMobileMenuOpen && (
             <div className="absolute top-16 left-0 right-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 shadow-lg z-50">
               <div className="px-4 py-2 space-y-1">
@@ -149,7 +149,7 @@ export default function Navigation() {
         </div>
       </nav>
 
-      {/* Fixed Footer with User Info and Sign Out */}
+      {/* FIXED FOOTER - USER INFO AND SIGN OUT */}
       <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 shadow-lg z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
           <div className="flex items-center justify-between">
@@ -170,6 +170,6 @@ export default function Navigation() {
           </div>
         </div>
       </div>
-    </>
+    </div>
   )
 }
