@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 interface BokehCircle {
   id: number;
@@ -9,8 +9,6 @@ interface BokehCircle {
   radius: number;
   opacity: number;
   color: string;
-  animationSpeed: number;
-  animationOffset: number;
 }
 
 interface BokehBackgroundProps {
@@ -18,7 +16,6 @@ interface BokehBackgroundProps {
 }
 
 const BokehBackground: React.FC<BokehBackgroundProps> = ({ className = '' }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
   const [circles, setCircles] = useState<BokehCircle[]>([]);
   const [isMounted, setIsMounted] = useState(false);
 
@@ -31,27 +28,28 @@ const BokehBackground: React.FC<BokehBackgroundProps> = ({ className = '' }) => 
 
     const generateCircles = () => {
       const newCircles: BokehCircle[] = [];
-      const circleCount = 25; // More circles for better coverage
+      const circleCount = 30; // More circles for better coverage
       
-      // Bokeh colors - warm orange/yellow tones, more dulled
+      // Bokeh colors - warm orange/yellow tones inspired by the reference image
       const colors = [
-        'rgba(255, 140, 0, 0.15)',    // Dark orange
-        'rgba(255, 165, 0, 0.12)',    // Orange  
-        'rgba(255, 200, 0, 0.18)',    // Golden yellow
-        'rgba(255, 215, 0, 0.10)',    // Gold
-        'rgba(255, 69, 0, 0.08)',     // Red-orange
-        'rgba(255, 160, 122, 0.14)',  // Light salmon
-        'rgba(255, 218, 185, 0.16)',  // Peach
+        '#FF8C00',  // Dark orange
+        '#FFA500',  // Orange  
+        '#FFD700',  // Gold
+        '#FF6347',  // Tomato
+        '#FF7F50',  // Coral
+        '#FFA07A',  // Light salmon
+        '#FFEAA7',  // Banana yellow
+        '#FDCB6E',  // Orange yellow
+        '#E17055',  // Terra cotta
+        '#FFAB00',  // Amber
       ];
 
       for (let i = 0; i < circleCount; i++) {
-        const radius = Math.random() * 120 + 40; // 40-160px radius for variety
-        const x = Math.random() * 100; // Percentage
-        const y = Math.random() * 100; // Percentage
-        const opacity = Math.random() * 0.3 + 0.1; // 0.1-0.4 opacity
+        const radius = Math.random() * 150 + 30; // 30-180px radius for variety
+        const x = Math.random() * 120 - 10; // -10% to 110% to allow overflow
+        const y = Math.random() * 120 - 10; // -10% to 110% to allow overflow
+        const opacity = Math.random() * 0.4 + 0.1; // 0.1-0.5 opacity
         const color = colors[Math.floor(Math.random() * colors.length)];
-        const animationSpeed = Math.random() * 0.5 + 0.2; // 0.2-0.7 speed multiplier
-        const animationOffset = Math.random() * Math.PI * 2; // Random phase offset
 
         newCircles.push({
           id: i,
@@ -60,8 +58,6 @@ const BokehBackground: React.FC<BokehBackgroundProps> = ({ className = '' }) => 
           radius,
           opacity,
           color,
-          animationSpeed,
-          animationOffset,
         });
       }
 
@@ -77,58 +73,54 @@ const BokehBackground: React.FC<BokehBackgroundProps> = ({ className = '' }) => 
 
   return (
     <div
-      ref={containerRef}
-      className={`fixed inset-0 overflow-hidden pointer-events-none ${className}`}
-      style={{ zIndex: -1 }}
+      className={`absolute inset-0 overflow-hidden pointer-events-none ${className}`}
+      style={{ 
+        zIndex: 0,
+        background: 'linear-gradient(135deg, #2c1810 0%, #1a0f08 50%, #0d0502 100%)'
+      }}
     >
-      {/* Background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-orange-50/30 via-yellow-50/20 to-orange-100/25" />
-      
       {/* Bokeh circles */}
       {circles.map((circle) => (
         <div
           key={circle.id}
-          className="absolute rounded-full blur-sm animate-pulse"
+          className="absolute rounded-full"
           style={{
             left: `${circle.x}%`,
             top: `${circle.y}%`,
             width: `${circle.radius}px`,
             height: `${circle.radius}px`,
-            backgroundColor: circle.color,
-            opacity: circle.opacity,
+            background: `radial-gradient(circle at 30% 30%, 
+              ${circle.color}${Math.round(circle.opacity * 255).toString(16).padStart(2, '0')}, 
+              ${circle.color}${Math.round(circle.opacity * 0.7 * 255).toString(16).padStart(2, '0')} 60%, 
+              transparent 80%)`,
             transform: 'translate(-50%, -50%)',
-            animation: `bokeh-float-${circle.id} ${8 / circle.animationSpeed}s ease-in-out infinite`,
-            animationDelay: `${circle.animationOffset}s`,
+            filter: 'blur(1px)',
+            animation: `bokehFloat ${8 + Math.random() * 4}s ease-in-out infinite`,
+            animationDelay: `${Math.random() * 2}s`,
           }}
         />
       ))}
       
-      {/* CSS for floating animation */}
-      <style jsx>{`
-        @keyframes bokeh-float-1 { 0%, 100% { transform: translate(-50%, -50%) translateY(0px); } 50% { transform: translate(-50%, -50%) translateY(-20px); } }
-        @keyframes bokeh-float-2 { 0%, 100% { transform: translate(-50%, -50%) translateY(0px); } 50% { transform: translate(-50%, -50%) translateY(-15px); } }
-        @keyframes bokeh-float-3 { 0%, 100% { transform: translate(-50%, -50%) translateY(0px); } 50% { transform: translate(-50%, -50%) translateY(-25px); } }
-        @keyframes bokeh-float-4 { 0%, 100% { transform: translate(-50%, -50%) translateY(0px); } 50% { transform: translate(-50%, -50%) translateY(-18px); } }
-        @keyframes bokeh-float-5 { 0%, 100% { transform: translate(-50%, -50%) translateY(0px); } 50% { transform: translate(-50%, -50%) translateY(-22px); } }
-        @keyframes bokeh-float-6 { 0%, 100% { transform: translate(-50%, -50%) translateY(0px); } 50% { transform: translate(-50%, -50%) translateY(-12px); } }
-        @keyframes bokeh-float-7 { 0%, 100% { transform: translate(-50%, -50%) translateY(0px); } 50% { transform: translate(-50%, -50%) translateY(-28px); } }
-        @keyframes bokeh-float-8 { 0%, 100% { transform: translate(-50%, -50%) translateY(0px); } 50% { transform: translate(-50%, -50%) translateY(-16px); } }
-        @keyframes bokeh-float-9 { 0%, 100% { transform: translate(-50%, -50%) translateY(0px); } 50% { transform: translate(-50%, -50%) translateY(-24px); } }
-        @keyframes bokeh-float-10 { 0%, 100% { transform: translate(-50%, -50%) translateY(0px); } 50% { transform: translate(-50%, -50%) translateY(-14px); } }
-        @keyframes bokeh-float-11 { 0%, 100% { transform: translate(-50%, -50%) translateY(0px); } 50% { transform: translate(-50%, -50%) translateY(-26px); } }
-        @keyframes bokeh-float-12 { 0%, 100% { transform: translate(-50%, -50%) translateY(0px); } 50% { transform: translate(-50%, -50%) translateY(-19px); } }
-        @keyframes bokeh-float-13 { 0%, 100% { transform: translate(-50%, -50%) translateY(0px); } 50% { transform: translate(-50%, -50%) translateY(-21px); } }
-        @keyframes bokeh-float-14 { 0%, 100% { transform: translate(-50%, -50%) translateY(0px); } 50% { transform: translate(-50%, -50%) translateY(-17px); } }
-        @keyframes bokeh-float-15 { 0%, 100% { transform: translate(-50%, -50%) translateY(0px); } 50% { transform: translate(-50%, -50%) translateY(-23px); } }
-        @keyframes bokeh-float-16 { 0%, 100% { transform: translate(-50%, -50%) translateY(0px); } 50% { transform: translate(-50%, -50%) translateY(-13px); } }
-        @keyframes bokeh-float-17 { 0%, 100% { transform: translate(-50%, -50%) translateY(0px); } 50% { transform: translate(-50%, -50%) translateY(-27px); } }
-        @keyframes bokeh-float-18 { 0%, 100% { transform: translate(-50%, -50%) translateY(0px); } 50% { transform: translate(-50%, -50%) translateY(-15px); } }
-        @keyframes bokeh-float-19 { 0%, 100% { transform: translate(-50%, -50%) translateY(0px); } 50% { transform: translate(-50%, -50%) translateY(-20px); } }
-        @keyframes bokeh-float-20 { 0%, 100% { transform: translate(-50%, -50%) translateY(0px); } 50% { transform: translate(-50%, -50%) translateY(-18px); } }
-        @keyframes bokeh-float-21 { 0%, 100% { transform: translate(-50%, -50%) translateY(0px); } 50% { transform: translate(-50%, -50%) translateY(-25px); } }
-        @keyframes bokeh-float-22 { 0%, 100% { transform: translate(-50%, -50%) translateY(0px); } 50% { transform: translate(-50%, -50%) translateY(-16px); } }
-        @keyframes bokeh-float-23 { 0%, 100% { transform: translate(-50%, -50%) translateY(0px); } 50% { transform: translate(-50%, -50%) translateY(-22px); } }
-        @keyframes bokeh-float-24 { 0%, 100% { transform: translate(-50%, -50%) translateY(0px); } 50% { transform: translate(-50%, -50%) translateY(-14px); } }
+      {/* Global CSS for animation */}
+      <style jsx global>{`
+        @keyframes bokehFloat {
+          0%, 100% {
+            transform: translate(-50%, -50%) translateY(0px) scale(1);
+            opacity: 0.8;
+          }
+          25% {
+            transform: translate(-50%, -50%) translateY(-10px) scale(1.05);
+            opacity: 1;
+          }
+          50% {
+            transform: translate(-50%, -50%) translateY(-20px) scale(0.95);
+            opacity: 0.9;
+          }
+          75% {
+            transform: translate(-50%, -50%) translateY(-10px) scale(1.02);
+            opacity: 1;
+          }
+        }
       `}</style>
     </div>
   );

@@ -32,9 +32,11 @@ export default function Home() {
 
   // Only show login page if user is not authenticated
   return (
-    <div className="font-sans flex items-center justify-center min-h-screen p-8 relative">
+    <div className="font-sans flex items-center justify-center min-h-screen p-8 relative overflow-hidden">
       <BokehBackground />
-      <GoogleLoginButton />
+      <div className="relative z-10">
+        <GoogleLoginButton />
+      </div>
     </div>
   );
 }
