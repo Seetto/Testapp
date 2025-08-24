@@ -148,10 +148,16 @@ export default function EventEditModal({ event, isOpen, onClose, onSave }: Event
         location: formData.location,
         start: isAllDay 
           ? { date: formData.startDate }
-          : { dateTime: new Date(formData.startDateTime).toISOString() },
+          : { 
+              dateTime: new Date(formData.startDateTime).toISOString(),
+              timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+            },
         end: isAllDay 
           ? { date: formData.endDate }
-          : { dateTime: new Date(formData.endDateTime).toISOString() }
+          : { 
+              dateTime: new Date(formData.endDateTime).toISOString(),
+              timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+            }
       }
 
       await onSave(event.id, updatedEvent)

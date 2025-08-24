@@ -204,20 +204,21 @@ export default function CalendarPage() {
         throw new Error(errorData.details || errorData.error || 'Failed to update event')
       }
 
-      await response.json()
+      const responseData = await response.json()
       
-      // Update the events list with the updated event
+      // Update the events list with the updated event from the API response
+      // This ensures we have the correctly formatted data from Google Calendar
       setEvents(prevEvents => 
         prevEvents.map(event => 
           event.id === eventId 
-            ? { ...event, ...updatedEvent }
+            ? { ...event, ...responseData.event }
             : event
         )
       )
 
       // Update the selected event if it's the same one
       if (selectedEvent && selectedEvent.id === eventId) {
-        setSelectedEvent(prev => prev ? { ...prev, ...updatedEvent } : null)
+        setSelectedEvent(prev => prev ? { ...prev, ...responseData.event } : null)
       }
 
       // Close the modal

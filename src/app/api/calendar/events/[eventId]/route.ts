@@ -82,6 +82,14 @@ export async function PATCH(
     // Get the update data from request body
     const updateData: CalendarEventUpdate = await request.json()
 
+    // Ensure timezone is set for datetime events if not provided
+    if (updateData.start?.dateTime && !updateData.start.timeZone) {
+      updateData.start.timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+    }
+    if (updateData.end?.dateTime && !updateData.end.timeZone) {
+      updateData.end.timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+    }
+
     // Create OAuth2 client
     const oauth2Client = new google.auth.OAuth2()
     oauth2Client.setCredentials({
@@ -91,12 +99,16 @@ export async function PATCH(
     // Create Calendar API client
     const calendar = google.calendar({ version: 'v3', auth: oauth2Client })
 
+    console.log('Updating event with data:', JSON.stringify(updateData, null, 2))
+
     // Update the event
     const response = await calendar.events.patch({
       calendarId: 'primary',
       eventId: eventId,
       requestBody: updateData,
     })
+
+    console.log('Google Calendar API response:', JSON.stringify(response.data, null, 2))
 
     return NextResponse.json({ 
       success: true, 
