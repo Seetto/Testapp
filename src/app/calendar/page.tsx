@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { redirect } from 'next/navigation'
 import { Session } from 'next-auth'
-import EventEditModal from '../../components/EventEditModal'
 
 interface ExtendedSession extends Session {
   accessToken?: string
@@ -33,8 +32,6 @@ export default function CalendarPage() {
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
-  const [isModalOpen, setIsModalOpen] = useState(false)
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -179,57 +176,10 @@ export default function CalendarPage() {
     }
   }
 
-  const openEditModal = (event: CalendarEvent) => {
-    setSelectedEvent(event)
-    setIsModalOpen(true)
-  }
-
-  const closeEditModal = () => {
-    setIsModalOpen(false)
-    setSelectedEvent(null)
-  }
-
-  const handleEventUpdate = async (eventId: string, updatedEvent: Partial<CalendarEvent>) => {
-    try {
-      const response = await fetch(`/api/calendar/events/${eventId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updatedEvent),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.details || errorData.error || 'Failed to update event')
-      }
-
-      const responseData = await response.json()
-      
-      // Update the events list with the updated event from the API response
-      // This ensures we have the correctly formatted data from Google Calendar
-      setEvents(prevEvents => 
-        prevEvents.map(event => 
-          event.id === eventId 
-            ? { ...event, ...responseData.event }
-            : event
-        )
-      )
-
-      // Update the selected event if it's the same one
-      if (selectedEvent && selectedEvent.id === eventId) {
-        setSelectedEvent(prev => prev ? { ...prev, ...responseData.event } : null)
-      }
-
-      // Close the modal
-      closeEditModal()
-      
-      // Optionally show a success message
-      console.log('Event updated successfully')
-    } catch (error) {
-      console.error('Error updating event:', error)
-      throw error // Re-throw to let the modal handle it
-    }
+  const openInGoogleCalendar = (event: CalendarEvent) => {
+    // Open the event directly in Google Calendar using the htmlLink
+    // This will automatically handle mobile app vs desktop browser
+    window.open(event.htmlLink, '_blank', 'noopener,noreferrer')
   }
 
   if (status === 'loading') {
@@ -360,13 +310,13 @@ export default function CalendarPage() {
                               </div>
                               <div className="flex items-center space-x-2">
                                 <button
-                                  onClick={() => openEditModal(event)}
+                                  onClick={() => openInGoogleCalendar(event)}
                                   className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs font-medium transition-colors flex items-center space-x-1"
                                 >
                                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                   </svg>
-                                  <span>Edit Event</span>
+                                  <span>View in Calendar</span>
                                 </button>
                                 {event.location && (
                                   <button
@@ -392,14 +342,6 @@ export default function CalendarPage() {
             })}
           </div>
         )}
-
-        {/* Event Edit Modal */}
-        <EventEditModal
-          event={selectedEvent}
-          isOpen={isModalOpen}
-          onClose={closeEditModal}
-          onSave={handleEventUpdate}
-        />
       </div>
     </div>
   )
