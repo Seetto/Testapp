@@ -285,7 +285,7 @@ export default function CalendarPage() {
                         <div className="flex items-start space-x-3">
                           <div className="flex-shrink-0 w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between">
+                            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between">
                               <div className="flex-1">
                                 <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">
                                   {event.summary || 'Untitled Event'}
@@ -308,7 +308,7 @@ export default function CalendarPage() {
                                   </p>
                                 )}
                               </div>
-                              <div className="flex items-center space-x-2">
+                              <div className="flex items-center space-x-2 mt-3 sm:mt-0 sm:ml-4">
                                 <button
                                   onClick={() => openInGoogleCalendar(event)}
                                   className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs font-medium transition-colors flex items-center space-x-1"
