@@ -284,12 +284,9 @@ export default function CalendarPage() {
                           // TODO: Implement route optimization functionality
                           console.log(`Optimize route for ${dateKey}`)
                         }}
-                        className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center space-x-2"
+                        className="bg-yellow-400 hover:bg-yellow-500 text-black px-4 py-2 rounded-md text-sm font-medium transition-colors"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
-                        <span>Optimize Route</span>
+                        Optimize Route
                       </button>
                     </div>
                   </div>
