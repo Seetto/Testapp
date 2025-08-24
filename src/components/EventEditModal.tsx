@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import PlacesAutocomplete from './PlacesAutocomplete'
 
 interface CalendarEvent {
   id: string
@@ -42,14 +43,35 @@ export default function EventEditModal({ event, isOpen, onClose, onSave }: Event
 
   useEffect(() => {
     if (event) {
+      // Helper function to format datetime for input field
+      const formatDateTimeForInput = (dateTimeString: string) => {
+        const date = new Date(dateTimeString)
+        // Format as YYYY-MM-DDTHH:MM for datetime-local input
+        const year = date.getFullYear()
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const day = String(date.getDate()).padStart(2, '0')
+        const hours = String(date.getHours()).padStart(2, '0')
+        const minutes = String(date.getMinutes()).padStart(2, '0')
+        return `${year}-${month}-${day}T${hours}:${minutes}`
+      }
+
+      // Helper function to format date for input field
+      const formatDateForInput = (dateString: string) => {
+        const date = new Date(dateString)
+        const year = date.getFullYear()
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const day = String(date.getDate()).padStart(2, '0')
+        return `${year}-${month}-${day}`
+      }
+      
       setFormData({
         summary: event.summary || '',
         description: event.description || '',
         location: event.location || '',
-        startDateTime: event.start.dateTime ? new Date(event.start.dateTime).toISOString().slice(0, 16) : '',
-        endDateTime: event.end.dateTime ? new Date(event.end.dateTime).toISOString().slice(0, 16) : '',
-        startDate: event.start.date || (event.start.dateTime ? new Date(event.start.dateTime).toISOString().slice(0, 10) : ''),
-        endDate: event.end.date || (event.end.dateTime ? new Date(event.end.dateTime).toISOString().slice(0, 10) : '')
+        startDateTime: event.start.dateTime ? formatDateTimeForInput(event.start.dateTime) : '',
+        endDateTime: event.end.dateTime ? formatDateTimeForInput(event.end.dateTime) : '',
+        startDate: event.start.date ? formatDateForInput(event.start.date) : (event.start.dateTime ? formatDateForInput(event.start.dateTime) : ''),
+        endDate: event.end.date ? formatDateForInput(event.end.date) : (event.end.dateTime ? formatDateForInput(event.end.dateTime) : '')
       })
       setIsEditing(false)
     }
@@ -145,14 +167,34 @@ export default function EventEditModal({ event, isOpen, onClose, onSave }: Event
   const handleCancel = () => {
     // Reset form data to original values
     if (event) {
+      // Helper function to format datetime for input field
+      const formatDateTimeForInput = (dateTimeString: string) => {
+        const date = new Date(dateTimeString)
+        const year = date.getFullYear()
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const day = String(date.getDate()).padStart(2, '0')
+        const hours = String(date.getHours()).padStart(2, '0')
+        const minutes = String(date.getMinutes()).padStart(2, '0')
+        return `${year}-${month}-${day}T${hours}:${minutes}`
+      }
+
+      // Helper function to format date for input field
+      const formatDateForInput = (dateString: string) => {
+        const date = new Date(dateString)
+        const year = date.getFullYear()
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const day = String(date.getDate()).padStart(2, '0')
+        return `${year}-${month}-${day}`
+      }
+
       setFormData({
         summary: event.summary || '',
         description: event.description || '',
         location: event.location || '',
-        startDateTime: event.start.dateTime ? new Date(event.start.dateTime).toISOString().slice(0, 16) : '',
-        endDateTime: event.end.dateTime ? new Date(event.end.dateTime).toISOString().slice(0, 16) : '',
-        startDate: event.start.date || (event.start.dateTime ? new Date(event.start.dateTime).toISOString().slice(0, 10) : ''),
-        endDate: event.end.date || (event.end.dateTime ? new Date(event.end.dateTime).toISOString().slice(0, 10) : '')
+        startDateTime: event.start.dateTime ? formatDateTimeForInput(event.start.dateTime) : '',
+        endDateTime: event.end.dateTime ? formatDateTimeForInput(event.end.dateTime) : '',
+        startDate: event.start.date ? formatDateForInput(event.start.date) : (event.start.dateTime ? formatDateForInput(event.start.dateTime) : ''),
+        endDate: event.end.date ? formatDateForInput(event.end.date) : (event.end.dateTime ? formatDateForInput(event.end.dateTime) : '')
       })
     }
     setIsEditing(false)
@@ -292,12 +334,12 @@ export default function EventEditModal({ event, isOpen, onClose, onSave }: Event
               Location
             </label>
             {isEditing ? (
-              <input
-                type="text"
+              <PlacesAutocomplete
                 value={formData.location}
-                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                onChange={(value) => setFormData({ ...formData, location: value })}
                 placeholder="Add location"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                disabled={isSaving}
               />
             ) : (
               <p className="text-gray-600 dark:text-gray-400">
