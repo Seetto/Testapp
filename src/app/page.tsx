@@ -1,10 +1,10 @@
 'use client'
 
-
 import { useSession } from "next-auth/react";
 import { redirect } from "next/navigation";
 import { useEffect } from "react";
 import GoogleLoginButton from "../components/GoogleLoginButton";
+import BokehBackground from "../components/BokehBackground";
 
 export default function Home() {
   const { data: session, status } = useSession();
@@ -32,7 +32,8 @@ export default function Home() {
 
   // Only show login page if user is not authenticated
   return (
-    <div className="font-sans flex items-center justify-center min-h-screen p-8">
+    <div className="font-sans flex items-center justify-center min-h-screen p-8 relative">
+      <BokehBackground />
       <GoogleLoginButton />
     </div>
   );

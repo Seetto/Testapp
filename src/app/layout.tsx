@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import BouncingBalls from "../components/BouncingBalls";
+
 import Providers from "../components/Providers";
 import Navigation from "../components/Navigation";
 
@@ -37,7 +37,6 @@ export default function RootLayout({
     <html lang="en">
       <body className={bodyClassName} suppressHydrationWarning={true}>
         <Providers>
-          <BouncingBalls ballCount={8} />
           <Navigation />
           <main className="pb-20">
             {children}
