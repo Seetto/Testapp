@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { redirect } from 'next/navigation'
 import { Session } from 'next-auth'
+import EventEditModal from '../../components/EventEditModal'
 
 interface ExtendedSession extends Session {
   accessToken?: string
@@ -32,6 +33,8 @@ export default function CalendarPage() {
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -176,6 +179,58 @@ export default function CalendarPage() {
     }
   }
 
+  const openEditModal = (event: CalendarEvent) => {
+    setSelectedEvent(event)
+    setIsModalOpen(true)
+  }
+
+  const closeEditModal = () => {
+    setIsModalOpen(false)
+    setSelectedEvent(null)
+  }
+
+  const handleEventUpdate = async (eventId: string, updatedEvent: Partial<CalendarEvent>) => {
+    try {
+      const response = await fetch(`/api/calendar/events/${eventId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatedEvent),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.details || errorData.error || 'Failed to update event')
+      }
+
+      await response.json()
+      
+      // Update the events list with the updated event
+      setEvents(prevEvents => 
+        prevEvents.map(event => 
+          event.id === eventId 
+            ? { ...event, ...updatedEvent }
+            : event
+        )
+      )
+
+      // Update the selected event if it's the same one
+      if (selectedEvent && selectedEvent.id === eventId) {
+        setSelectedEvent(prev => prev ? { ...prev, ...updatedEvent } : null)
+      }
+
+      // Close the modal
+      closeEditModal()
+      
+      // Optionally show a success message
+      console.log('Event updated successfully')
+    } catch (error) {
+      console.error('Error updating event:', error)
+      throw error // Re-throw to let the modal handle it
+    }
+  }
+
   if (status === 'loading') {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
@@ -302,18 +357,29 @@ export default function CalendarPage() {
                                   </p>
                                 )}
                               </div>
-                              {event.location && (
+                              <div className="flex items-center space-x-2">
                                 <button
-                                  onClick={() => openGoogleMapsRoute(event.location!)}
-                                  className="ml-4 bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors flex items-center space-x-1"
+                                  onClick={() => openEditModal(event)}
+                                  className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs font-medium transition-colors flex items-center space-x-1"
                                 >
                                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                   </svg>
-                                  <span>Get Directions</span>
+                                  <span>Edit Event</span>
                                 </button>
-                              )}
+                                {event.location && (
+                                  <button
+                                    onClick={() => openGoogleMapsRoute(event.location!)}
+                                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors flex items-center space-x-1"
+                                  >
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                    <span>Get Directions</span>
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -325,6 +391,14 @@ export default function CalendarPage() {
             })}
           </div>
         )}
+
+        {/* Event Edit Modal */}
+        <EventEditModal
+          event={selectedEvent}
+          isOpen={isModalOpen}
+          onClose={closeEditModal}
+          onSave={handleEventUpdate}
+        />
       </div>
     </div>
   )
