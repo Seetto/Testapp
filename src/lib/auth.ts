@@ -17,9 +17,9 @@ export const authOptions = {
   url: process.env.NEXTAUTH_URL,
   callbacks: {
     async redirect({ url, baseUrl }: { url: string; baseUrl: string }) {
-      // Redirect to success page after successful login
+      // Redirect to calendar page after successful login
       if (url === baseUrl || url === `${baseUrl}/`) {
-        return `${baseUrl}/auth/success`
+        return `${baseUrl}/calendar`
       }
       // Allow same-origin URLs
       if (url.startsWith(baseUrl)) return url
