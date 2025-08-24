@@ -65,7 +65,7 @@ export default function Navigation() {
     return (
       <nav className="bg-white dark:bg-gray-900 shadow-sm border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-end h-16 items-center">
+          <div className="flex justify-start h-16 items-center">
             <div className="w-6 h-6 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
           </div>
         </div>
@@ -82,7 +82,7 @@ export default function Navigation() {
       {/* MINIMAL NAVBAR - ONLY HAMBURGER MENU */}
       <nav className="bg-white dark:bg-gray-900 shadow-sm border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-end items-center h-16">
+          <div className="flex justify-start items-center h-16">
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white p-2 rounded-md transition-colors"

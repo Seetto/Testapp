@@ -210,7 +210,7 @@ export default function CalendarPage() {
             My Calendar
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Your upcoming events from Google Calendar
+            Your upcoming inspections
           </p>
         </div>
 
