@@ -48,7 +48,7 @@ export default function GoogleLoginButton() {
   return (
     <button
       onClick={() => signIn('google')}
-      className="flex items-center gap-4 bg-white hover:bg-gray-50 px-8 py-4 rounded-xl shadow-md hover:shadow-lg border border-gray-200 transition-all duration-200 active:scale-95 active:shadow-sm transform hover:scale-105"
+      className="flex items-center gap-4 bg-white hover:bg-gray-50 px-8 py-4 rounded-xl shadow-xl hover:shadow-2xl border border-gray-200 transition-all duration-200 active:scale-95 active:shadow-lg transform hover:scale-105"
     >
       <div className="scale-150">
         <GoogleIcon />
