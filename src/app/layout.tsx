@@ -21,8 +21,6 @@ export const metadata: Metadata = {
   title: "Testapp - Calendar & Events",
   description: "A calendar and events management Progressive Web App",
   manifest: "/manifest.json",
-  themeColor: "#8DD3C7",
-  viewport: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -38,6 +36,14 @@ export const metadata: Metadata = {
       { url: "/icons/icon-512x512.svg", sizes: "512x512" },
     ],
   },
+};
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: '#8DD3C7',
 };
 
 export default function RootLayout({
