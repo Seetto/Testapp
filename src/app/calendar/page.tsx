@@ -176,6 +176,101 @@ export default function CalendarPage() {
     }
   }
 
+  const routeAllForDay = (dateEvents: CalendarEvent[]) => {
+    // Filter events that have locations
+    const eventsWithLocations = dateEvents.filter(event => event.location && event.location.trim() !== '')
+    
+    if (eventsWithLocations.length === 0) {
+      alert('No events with locations found for this day.')
+      return
+    }
+
+    if (eventsWithLocations.length === 1) {
+      // If only one location, just open regular directions
+      openGoogleMapsRoute(eventsWithLocations[0].location!)
+      return
+    }
+
+    // Get user's current location first
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords
+          const origin = `${latitude},${longitude}`
+          
+          // Sort events by time to create a logical route order
+          const sortedEvents = eventsWithLocations.sort((a, b) => {
+            const timeA = a.start.dateTime || a.start.date || ''
+            const timeB = b.start.dateTime || b.start.date || ''
+            return new Date(timeA).getTime() - new Date(timeB).getTime()
+          })
+          
+          // Create waypoints from all locations except the last one
+          const waypoints = sortedEvents.slice(0, -1).map(event => 
+            encodeURIComponent(event.location!)
+          ).join('/')
+          
+          // Last location becomes the destination
+          const destination = encodeURIComponent(sortedEvents[sortedEvents.length - 1].location!)
+          
+          // Construct Google Maps URL for multi-stop route
+          const mapsUrl = `https://www.google.com/maps/dir/${origin}/${waypoints}/${destination}`
+          window.open(mapsUrl, '_blank')
+        },
+        (error) => {
+          console.error('Error getting location:', error)
+          // Fallback: create route without current location
+          routeAllWithoutLocation(eventsWithLocations)
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 300000 // 5 minutes
+        }
+      )
+    } else {
+      // Geolocation not supported, create route without current location
+      routeAllWithoutLocation(eventsWithLocations)
+    }
+  }
+
+  const routeAllWithoutLocation = (eventsWithLocations: CalendarEvent[]) => {
+    // Sort events by time to create a logical route order
+    const sortedEvents = eventsWithLocations.sort((a, b) => {
+      const timeA = a.start.dateTime || a.start.date || ''
+      const timeB = b.start.dateTime || b.start.date || ''
+      return new Date(timeA).getTime() - new Date(timeB).getTime()
+    })
+    
+    if (sortedEvents.length === 1) {
+      // Single location, just search for it
+      const encodedLocation = encodeURIComponent(sortedEvents[0].location!)
+      const mapsUrl = `https://www.google.com/maps/search/${encodedLocation}`
+      window.open(mapsUrl, '_blank')
+      return
+    }
+    
+    // First location as origin
+    const origin = encodeURIComponent(sortedEvents[0].location!)
+    
+    // Create waypoints from middle locations
+    const waypoints = sortedEvents.slice(1, -1).map(event => 
+      encodeURIComponent(event.location!)
+    ).join('/')
+    
+    // Last location as destination
+    const destination = encodeURIComponent(sortedEvents[sortedEvents.length - 1].location!)
+    
+    // Construct Google Maps URL
+    let mapsUrl = `https://www.google.com/maps/dir/${origin}/`
+    if (waypoints) {
+      mapsUrl += `${waypoints}/`
+    }
+    mapsUrl += destination
+    
+    window.open(mapsUrl, '_blank')
+  }
+
   const openInGoogleCalendar = (event: CalendarEvent) => {
     // Open the event directly in Google Calendar using the htmlLink
     // This will automatically handle mobile app vs desktop browser
@@ -280,11 +375,8 @@ export default function CalendarPage() {
                         })}
                       </h2>
                       <button
-                        onClick={() => {
-                          // TODO: Implement route all functionality
-                          console.log(`Route all for ${dateKey}`)
-                        }}
-                        className="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                        onClick={() => routeAllForDay(dateEvents)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
                       >
                         Route All
                       </button>
