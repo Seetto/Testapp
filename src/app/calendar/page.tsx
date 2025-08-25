@@ -281,12 +281,12 @@ export default function CalendarPage() {
                       </h2>
                       <button
                         onClick={() => {
-                          // TODO: Implement route optimization functionality
-                          console.log(`Optimize route for ${dateKey}`)
+                          // TODO: Implement route all functionality
+                          console.log(`Route all for ${dateKey}`)
                         }}
                         className="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
                       >
-                        Optimize Route
+                        Route All
                       </button>
                     </div>
                   </div>
