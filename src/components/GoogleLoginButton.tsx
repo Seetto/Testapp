@@ -33,9 +33,9 @@ export default function GoogleLoginButton() {
 
   if (status === "loading") {
     return (
-      <div className="flex items-center gap-4 bg-white/95 dark:bg-gray-800/95 px-8 py-4 rounded-xl shadow-2xl border border-gray-200/50 dark:border-gray-700 backdrop-blur-sm">
+      <div className="flex items-center gap-4 bg-white px-8 py-4 rounded-xl shadow-md border border-gray-200">
         <div className="w-6 h-6 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
-        <span className="font-sans text-lg text-gray-600 dark:text-gray-400">Loading...</span>
+        <span className="font-sans text-lg text-gray-600">Loading...</span>
       </div>
     )
   }
@@ -48,12 +48,12 @@ export default function GoogleLoginButton() {
   return (
     <button
       onClick={() => signIn('google')}
-      className="flex items-center gap-4 bg-white/95 dark:bg-gray-800/95 hover:bg-white dark:hover:bg-gray-700 px-8 py-4 rounded-xl shadow-2xl border border-gray-200/50 dark:border-gray-700 transition-all duration-200 active:scale-95 active:shadow-lg transform hover:scale-105 backdrop-blur-sm"
+      className="flex items-center gap-4 bg-white hover:bg-gray-50 px-8 py-4 rounded-xl shadow-md hover:shadow-lg border border-gray-200 transition-all duration-200 active:scale-95 active:shadow-sm transform hover:scale-105"
     >
       <div className="scale-150">
         <GoogleIcon />
       </div>
-      <span className="font-sans text-lg font-medium text-gray-900 dark:text-white">
+      <span className="font-sans text-lg font-medium text-gray-900">
         Sign in with Google
       </span>
     </button>
