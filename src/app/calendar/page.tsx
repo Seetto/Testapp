@@ -32,6 +32,7 @@ export default function CalendarPage() {
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [completedJobs, setCompletedJobs] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -277,6 +278,18 @@ export default function CalendarPage() {
     window.open(event.htmlLink, '_blank', 'noopener,noreferrer')
   }
 
+  const toggleJobCompletion = (eventId: string) => {
+    setCompletedJobs((prev: Set<string>) => {
+      const newSet = new Set(prev)
+      if (newSet.has(eventId)) {
+        newSet.delete(eventId)
+      } else {
+        newSet.add(eventId)
+      }
+      return newSet
+    })
+  }
+
   if (status === 'loading') {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
@@ -422,16 +435,31 @@ export default function CalendarPage() {
                                   <span>View in Calendar</span>
                                 </button>
                                 {event.location && (
-                                  <button
-                                    onClick={() => openGoogleMapsRoute(event.location!)}
-                                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors flex items-center space-x-1"
-                                  >
-                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                                    </svg>
-                                    <span>Get Directions</span>
-                                  </button>
+                                  <>
+                                    <button
+                                      onClick={() => openGoogleMapsRoute(event.location!)}
+                                      className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors flex items-center space-x-1"
+                                    >
+                                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                      </svg>
+                                      <span>Get Directions</span>
+                                    </button>
+                                    <button
+                                      onClick={() => toggleJobCompletion(event.id)}
+                                      className={`${
+                                        completedJobs.has(event.id)
+                                          ? 'bg-green-500 hover:bg-green-600'
+                                          : 'bg-gray-400 hover:bg-gray-500'
+                                      } text-white px-2 py-1 rounded text-xs font-medium transition-colors flex items-center`}
+                                      title={completedJobs.has(event.id) ? 'Job completed' : 'Mark as completed'}
+                                    >
+                                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                      </svg>
+                                    </button>
+                                  </>
                                 )}
                               </div>
                             </div>
