@@ -305,7 +305,7 @@ export default function CalendarPage() {
             My Calendar
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Your upcoming inspections
+            Your inspections and bookings
           </p>
         </div>
 
@@ -351,7 +351,7 @@ export default function CalendarPage() {
             </svg>
             <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No events found</h3>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              You don&apos;t have any upcoming events in the next 30 days.
+              You don&apos;t have any events in the past 30 days or next 30 days.
             </p>
           </div>
         )}

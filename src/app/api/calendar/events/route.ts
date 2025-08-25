@@ -47,17 +47,19 @@ export async function GET() {
     // Create Calendar API client
     const calendar = google.calendar({ version: 'v3', auth: oauth2Client })
 
-    // Get calendar events for the next 30 days
+    // Get calendar events from 30 days ago to 30 days in the future
     const now = new Date()
+    const thirtyDaysAgo = new Date()
+    thirtyDaysAgo.setDate(now.getDate() - 30)
     const thirtyDaysFromNow = new Date()
     thirtyDaysFromNow.setDate(now.getDate() + 30)
 
     console.log('Calling Google Calendar API...')
     const response = await calendar.events.list({
       calendarId: 'primary',
-      timeMin: now.toISOString(),
+      timeMin: thirtyDaysAgo.toISOString(),
       timeMax: thirtyDaysFromNow.toISOString(),
-      maxResults: 50,
+      maxResults: 100,
       singleEvents: true,
       orderBy: 'startTime',
     })
