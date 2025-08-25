@@ -1,0 +1,22 @@
+<svg width="32" height="32" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Green circular background -->
+  <circle cx="256" cy="256" r="256" fill="#8DD3C7"/>
+  
+  <!-- White map base -->
+  <path d="M 80 200 L 140 180 L 200 320 L 300 310 L 360 200 L 432 220 L 400 360 L 340 380 L 80 380 Z" fill="white" stroke="#E0E0E0" stroke-width="4"/>
+  
+  <!-- Blue map sections -->
+  <path d="M 140 180 L 200 200 L 180 300 L 140 320 L 100 280 Z" fill="#87CEEB"/>
+  <path d="M 200 200 L 300 190 L 320 280 L 260 310 L 180 300 Z" fill="#6BB6FF"/>
+  <path d="M 300 190 L 360 200 L 380 280 L 320 300 L 320 280 Z" fill="#87CEEB"/>
+  
+  <!-- Red location pin -->
+  <path d="M 256 140 C 230 140 210 160 210 186 C 210 220 256 280 256 280 C 256 280 302 220 302 186 C 302 160 282 140 256 140 Z" fill="#FF5733"/>
+  
+  <!-- White circle inside pin -->
+  <circle cx="256" cy="186" r="20" fill="white"/>
+  
+  <!-- Map fold lines -->
+  <line x1="200" y1="180" x2="200" y2="380" stroke="#D0D0D0" stroke-width="2"/>
+  <line x1="300" y1="180" x2="300" y2="380" stroke="#D0D0D0" stroke-width="2"/>
+</svg>
