@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { redirect } from 'next/navigation'
 import { Session } from 'next-auth'
+import CalendarSelector from '@/components/CalendarSelector'
 
 interface ExtendedSession extends Session {
   accessToken?: string
@@ -46,6 +47,7 @@ export default function NeedToBookPage() {
   const [data, setData] = useState<NearbyJobsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [selectedCalendarId, setSelectedCalendarId] = useState<string>('all')
   const [searchResults, setSearchResults] = useState<{
     needToBookEvent: CalendarEvent
     nearbyJobs: Array<{event: CalendarEvent, distance: number, date: string}>
@@ -66,24 +68,71 @@ export default function NeedToBookPage() {
     if ((session as ExtendedSession)?.accessToken) {
       fetchNeedToBookEvents()
     }
-  }, [session, startDate]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [session, startDate, selectedCalendarId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchNeedToBookEvents = async () => {
     try {
       setLoading(true)
-      const url = `/api/calendar/need-to-book?startDate=${startDate}`
-      const response = await fetch(url)
       
-      if (!response.ok) {
-        const errorData = await response.json()
-        if (response.status === 401) {
-          throw new Error('Please sign out and sign in again to grant calendar permissions')
+      if (selectedCalendarId === 'all') {
+        // Fetch from all calendars
+        const calendarsResponse = await fetch('/api/calendar/calendars')
+        if (!calendarsResponse.ok) {
+          throw new Error('Failed to fetch calendars list')
         }
-        throw new Error(errorData.details || errorData.error || 'Failed to fetch events')
+        const calendarsData = await calendarsResponse.json()
+        const calendars = calendarsData.calendars || []
+        
+        // Aggregate data from all calendars
+        let allNeedToBookEvents: CalendarEvent[] = []
+        let allNearbyJobsByDay: { [date: string]: any } = {}
+        let warnings: string[] = []
+        
+        for (const calendar of calendars) {
+          try {
+            const url = `/api/calendar/need-to-book?startDate=${startDate}&calendarId=${encodeURIComponent(calendar.id)}`
+            const response = await fetch(url)
+            if (response.ok) {
+              const responseData = await response.json()
+              allNeedToBookEvents.push(...(responseData.needToBookEvents || []))
+              Object.assign(allNearbyJobsByDay, responseData.nearbyJobsByDay || {})
+              if (responseData.warning) {
+                warnings.push(`${calendar.summary}: ${responseData.warning}`)
+              }
+            }
+          } catch (err) {
+            console.warn(`Failed to fetch need-to-book events from calendar ${calendar.summary}:`, err)
+          }
+        }
+        
+        // Sort events by start time
+        allNeedToBookEvents.sort((a, b) => {
+          const timeA = a.start.dateTime || a.start.date || ''
+          const timeB = b.start.dateTime || b.start.date || ''
+          return new Date(timeA).getTime() - new Date(timeB).getTime()
+        })
+        
+        setData({
+          needToBookEvents: allNeedToBookEvents,
+          nearbyJobsByDay: allNearbyJobsByDay,
+          warning: warnings.length > 0 ? warnings.join('; ') : undefined
+        })
+      } else {
+        // Fetch from specific calendar
+        const url = `/api/calendar/need-to-book?startDate=${startDate}&calendarId=${encodeURIComponent(selectedCalendarId)}`
+        const response = await fetch(url)
+        
+        if (!response.ok) {
+          const errorData = await response.json()
+          if (response.status === 401) {
+            throw new Error('Please sign out and sign in again to grant calendar permissions')
+          }
+          throw new Error(errorData.details || errorData.error || 'Failed to fetch events')
+        }
+        
+        const responseData = await response.json()
+        setData(responseData)
       }
-      
-      const responseData = await response.json()
-      setData(responseData)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
@@ -169,20 +218,47 @@ export default function NeedToBookPage() {
       searchEndDate.setDate(eventDate.getDate() + 3)
       
       // Fetch ALL calendar events for the week to search through
-      const allEventsUrl = `/api/calendar/events?startDate=${searchStartDate.toISOString().split('T')[0]}`
-      console.log('📅 Fetching events from:', allEventsUrl)
+      let allEvents: CalendarEvent[] = []
       
-      const allEventsResponse = await fetch(allEventsUrl).catch(fetchError => {
-        console.error('❌ Events fetch failed:', fetchError)
-        throw new Error(`Failed to fetch calendar events: ${fetchError.message}`)
-      })
-      
-      if (!allEventsResponse.ok) {
-        throw new Error('Failed to fetch calendar events for search')
+      if (selectedCalendarId === 'all') {
+        // Fetch from all calendars
+        const calendarsResponse = await fetch('/api/calendar/calendars')
+        if (calendarsResponse.ok) {
+          const calendarsData = await calendarsResponse.json()
+          const calendars = calendarsData.calendars || []
+          
+          for (const calendar of calendars) {
+            try {
+              const allEventsUrl = `/api/calendar/events?startDate=${searchStartDate.toISOString().split('T')[0]}&calendarId=${encodeURIComponent(calendar.id)}`
+              const allEventsResponse = await fetch(allEventsUrl)
+              if (allEventsResponse.ok) {
+                const allEventsData = await allEventsResponse.json()
+                allEvents.push(...(allEventsData.events || []))
+              }
+            } catch (err) {
+              console.warn(`Failed to fetch events from calendar ${calendar.summary}:`, err)
+            }
+          }
+        }
+      } else {
+        // Fetch from specific calendar
+        const allEventsUrl = `/api/calendar/events?startDate=${searchStartDate.toISOString().split('T')[0]}&calendarId=${encodeURIComponent(selectedCalendarId)}`
+        console.log('📅 Fetching events from:', allEventsUrl)
+        
+        const allEventsResponse = await fetch(allEventsUrl).catch(fetchError => {
+          console.error('❌ Events fetch failed:', fetchError)
+          throw new Error(`Failed to fetch calendar events: ${fetchError.message}`)
+        })
+        
+        if (!allEventsResponse.ok) {
+          throw new Error('Failed to fetch calendar events for search')
+        }
+        
+        const allEventsData = await allEventsResponse.json()
+        allEvents = allEventsData.events || []
       }
       
-      const allEventsData = await allEventsResponse.json()
-      const allEvents = allEventsData.events || []
+      console.log(`📅 Fetched ${allEvents.length} total events for search`)
       
       // Now create a comprehensive search request to find nearby jobs
       const searchUrl = `/api/calendar/need-to-book/search`
@@ -230,10 +306,36 @@ export default function NeedToBookPage() {
       console.error('Error searching nearby days:', error)
       // Fallback: try to search with current data
       try {
-        const allEventsUrl = `/api/calendar/events?startDate=${startDate}`
-        const allEventsResponse = await fetch(allEventsUrl)
-        const allEventsData = await allEventsResponse.json()
-        const nearbyJobs = await findNearbyJobsClientSide(needToBookEvent, allEventsData.events || [])
+        let fallbackEvents: CalendarEvent[] = []
+        
+        if (selectedCalendarId === 'all') {
+          // Fetch from all calendars for fallback
+          const calendarsResponse = await fetch('/api/calendar/calendars')
+          if (calendarsResponse.ok) {
+            const calendarsData = await calendarsResponse.json()
+            const calendars = calendarsData.calendars || []
+            
+            for (const calendar of calendars) {
+              try {
+                const allEventsUrl = `/api/calendar/events?startDate=${startDate}&calendarId=${encodeURIComponent(calendar.id)}`
+                const allEventsResponse = await fetch(allEventsUrl)
+                if (allEventsResponse.ok) {
+                  const allEventsData = await allEventsResponse.json()
+                  fallbackEvents.push(...(allEventsData.events || []))
+                }
+              } catch (err) {
+                console.warn(`Fallback: Failed to fetch events from calendar ${calendar.summary}:`, err)
+              }
+            }
+          }
+        } else {
+          const allEventsUrl = `/api/calendar/events?startDate=${startDate}&calendarId=${encodeURIComponent(selectedCalendarId)}`
+          const allEventsResponse = await fetch(allEventsUrl)
+          const allEventsData = await allEventsResponse.json()
+          fallbackEvents = allEventsData.events || []
+        }
+        
+        const nearbyJobs = await findNearbyJobsClientSide(needToBookEvent, fallbackEvents)
         displaySearchResults(needToBookEvent, nearbyJobs, 'Using fallback search - API connection failed')
       } catch (fallbackError) {
         console.error('Fallback search failed:', fallbackError)
@@ -364,17 +466,23 @@ export default function NeedToBookPage() {
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2 sm:mb-0">
               Need to Book
             </h1>
-            <div className="flex items-center space-x-2">
-              <label htmlFor="start-date" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Start from:
-              </label>
-              <input
-                id="start-date"
-                type="date"
-                value={startDate}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setStartDate(e.target.value)}
-                className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
+              <CalendarSelector
+                selectedCalendarId={selectedCalendarId}
+                onCalendarChange={setSelectedCalendarId}
               />
+              <div className="flex items-center space-x-2">
+                <label htmlFor="start-date" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Start from:
+                </label>
+                <input
+                  id="start-date"
+                  type="date"
+                  value={startDate}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setStartDate(e.target.value)}
+                  className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
             </div>
           </div>
           <p className="text-gray-600 dark:text-gray-400">

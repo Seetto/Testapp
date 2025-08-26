@@ -38,9 +38,10 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get start date from URL parameters
+    // Get start date and calendar ID from URL parameters
     const { searchParams } = new URL(request.url)
     const startDateParam = searchParams.get('startDate')
+    const calendarIdParam = searchParams.get('calendarId') || 'primary'
     
     // Create OAuth2 client
     const oauth2Client = new google.auth.OAuth2()
@@ -61,11 +62,12 @@ export async function GET(request: Request) {
     endDate.setDate(startDate.getDate() + 90)
 
     console.log('Calling Google Calendar API...')
+    console.log('Calendar ID:', calendarIdParam)
     console.log('Start date:', startDate.toISOString())
     console.log('End date:', endDate.toISOString())
     
     const response = await calendar.events.list({
-      calendarId: 'primary',
+      calendarId: calendarIdParam,
       timeMin: startDate.toISOString(),
       timeMax: endDate.toISOString(),
       maxResults: 100,

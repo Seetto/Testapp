@@ -81,9 +81,10 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get start date from URL parameters
+    // Get start date and calendar ID from URL parameters
     const { searchParams } = new URL(request.url)
     const startDateParam = searchParams.get('startDate')
+    const calendarIdParam = searchParams.get('calendarId') || 'primary'
     
     // Create OAuth2 client
     const oauth2Client = new google.auth.OAuth2()
@@ -103,9 +104,10 @@ export async function GET(request: Request) {
     endDate.setDate(startDate.getDate() + 90)
 
     console.log('Fetching all calendar events for need-to-book analysis...')
+    console.log('Calendar ID:', calendarIdParam)
     
     const response = await calendar.events.list({
-      calendarId: 'primary',
+      calendarId: calendarIdParam,
       timeMin: startDate.toISOString(),
       timeMax: endDate.toISOString(),
       maxResults: 500, // Increased to get more events for analysis

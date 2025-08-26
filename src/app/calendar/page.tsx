@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { redirect } from 'next/navigation'
 import { Session } from 'next-auth'
+import CalendarSelector from '@/components/CalendarSelector'
 
 interface ExtendedSession extends Session {
   accessToken?: string
@@ -33,6 +34,7 @@ export default function CalendarPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [completedJobs, setCompletedJobs] = useState<Set<string>>(new Set())
+  const [selectedCalendarId, setSelectedCalendarId] = useState<string>('all')
   const [startDate, setStartDate] = useState<string>(() => {
     // Default to today's date in YYYY-MM-DD format
     const today = new Date()
@@ -49,28 +51,68 @@ export default function CalendarPage() {
     if ((session as ExtendedSession)?.accessToken) {
       fetchCalendarEvents()
     }
-  }, [session, startDate]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [session, startDate, selectedCalendarId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchCalendarEvents = async () => {
     try {
       setLoading(true)
-      const url = `/api/calendar/events?startDate=${startDate}`
-      const response = await fetch(url)
       
-      if (!response.ok) {
-        const errorData = await response.json()
-        if (response.status === 401) {
-          throw new Error('Please sign out and sign in again to grant calendar permissions')
+      if (selectedCalendarId === 'all') {
+        // Fetch from all calendars
+        const calendarsResponse = await fetch('/api/calendar/calendars')
+        if (!calendarsResponse.ok) {
+          throw new Error('Failed to fetch calendars list')
         }
-        throw new Error(errorData.details || errorData.error || 'Failed to fetch calendar events')
+        const calendarsData = await calendarsResponse.json()
+        const calendars = calendarsData.calendars || []
+        
+        // Fetch events from each calendar
+        const allEvents: CalendarEvent[] = []
+        for (const calendar of calendars) {
+          try {
+            const url = `/api/calendar/events?startDate=${startDate}&calendarId=${encodeURIComponent(calendar.id)}`
+            const response = await fetch(url)
+            if (response.ok) {
+              const data = await response.json()
+              allEvents.push(...(data.events || []))
+            }
+          } catch (err) {
+            console.warn(`Failed to fetch events from calendar ${calendar.summary}:`, err)
+          }
+        }
+        
+        // Filter out "Need to book" events and sort by start time
+        const filteredEvents = allEvents
+          .filter((event: CalendarEvent) => 
+            !event.summary || !event.summary.toLowerCase().includes('need to book')
+          )
+          .sort((a, b) => {
+            const timeA = a.start.dateTime || a.start.date || ''
+            const timeB = b.start.dateTime || b.start.date || ''
+            return new Date(timeA).getTime() - new Date(timeB).getTime()
+          })
+        
+        setEvents(filteredEvents)
+      } else {
+        // Fetch from specific calendar
+        const url = `/api/calendar/events?startDate=${startDate}&calendarId=${encodeURIComponent(selectedCalendarId)}`
+        const response = await fetch(url)
+        
+        if (!response.ok) {
+          const errorData = await response.json()
+          if (response.status === 401) {
+            throw new Error('Please sign out and sign in again to grant calendar permissions')
+          }
+          throw new Error(errorData.details || errorData.error || 'Failed to fetch calendar events')
+        }
+        
+        const data = await response.json()
+        // Filter out "Need to book" events from the main calendar view
+        const filteredEvents = (data.events || []).filter((event: CalendarEvent) => 
+          !event.summary || !event.summary.toLowerCase().includes('need to book')
+        )
+        setEvents(filteredEvents)
       }
-      
-      const data = await response.json()
-      // Filter out "Need to book" events from the main calendar view
-      const filteredEvents = (data.events || []).filter((event: CalendarEvent) => 
-        !event.summary || !event.summary.toLowerCase().includes('need to book')
-      )
-      setEvents(filteredEvents)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
@@ -328,17 +370,23 @@ export default function CalendarPage() {
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2 sm:mb-0">
               My Calendar
             </h1>
-            <div className="flex items-center space-x-2">
-              <label htmlFor="start-date" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Start from:
-              </label>
-              <input
-                id="start-date"
-                type="date"
-                value={startDate}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setStartDate(e.target.value)}
-                className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
+              <CalendarSelector
+                selectedCalendarId={selectedCalendarId}
+                onCalendarChange={setSelectedCalendarId}
               />
+              <div className="flex items-center space-x-2">
+                <label htmlFor="start-date" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Start from:
+                </label>
+                <input
+                  id="start-date"
+                  type="date"
+                  value={startDate}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setStartDate(e.target.value)}
+                  className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
             </div>
           </div>
           <p className="text-gray-600 dark:text-gray-400">
