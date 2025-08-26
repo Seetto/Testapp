@@ -194,6 +194,12 @@ export default function NeedToBookPage() {
       })
       
       if (!searchResponse.ok) {
+        console.error(`Search API failed with status: ${searchResponse.status}`)
+        const errorText = await searchResponse.text()
+        console.error('Search API error response:', errorText)
+        
+        alert(`Search API failed (${searchResponse.status}). Using simplified search without accurate distances. Check console for details.`)
+        
         // If the new endpoint doesn't exist, fall back to client-side calculation
         const nearbyJobs = await findNearbyJobsClientSide(needToBookEvent, allEvents)
         displaySearchResults(needToBookEvent, nearbyJobs)
@@ -201,6 +207,12 @@ export default function NeedToBookPage() {
       }
       
       const searchResults = await searchResponse.json()
+      console.log('Search API returned:', searchResults)
+      
+      if (searchResults.warning) {
+        console.warn('Search API warning:', searchResults.warning)
+      }
+      
       displaySearchResults(needToBookEvent, searchResults.nearbyJobs || [])
 
     } catch (error) {
@@ -223,7 +235,9 @@ export default function NeedToBookPage() {
 
   const findNearbyJobsClientSide = async (needToBookEvent: CalendarEvent, allEvents: CalendarEvent[]) => {
     // This is a client-side fallback for finding nearby jobs
-    console.log('Using client-side fallback distance calculation')
+    console.log('WARNING: Using client-side fallback - distances will be marked as unknown')
+    console.log('This means the Google Maps API geocoding is not working properly')
+    
     const nearbyJobs: Array<{event: CalendarEvent, distance: number, date: string}> = []
     
     // Filter out the "Need to book" event itself and events without locations
@@ -236,41 +250,29 @@ export default function NeedToBookPage() {
     
     console.log(`Client-side searching through ${eventsWithLocations.length} events`)
     
-    // Try to use browser's geolocation API for better distance estimates
-    if (navigator.geolocation && 'geolocation' in navigator) {
-      // For now, just return all events with a warning that distances are estimates
-      eventsWithLocations.forEach(event => {
-        const eventDate = new Date(event.start.dateTime || event.start.date || '')
-        const targetDate = new Date(needToBookEvent.start.dateTime || needToBookEvent.start.date || '')
-        const dayDiff = Math.abs((eventDate.getTime() - targetDate.getTime()) / (1000 * 60 * 60 * 24))
-        
-        // Only include events within 7 days and mark distance as estimated
-        if (dayDiff <= 7) {
-          nearbyJobs.push({
-            event,
-            distance: 999, // Use 999 to indicate this is an estimate/unknown distance
-            date: eventDate.toDateString()
-          })
-        }
-      })
-    } else {
-      // Very basic fallback
-      eventsWithLocations.forEach(event => {
-        const eventDate = new Date(event.start.dateTime || event.start.date || '')
-        const targetDate = new Date(needToBookEvent.start.dateTime || needToBookEvent.start.date || '')
-        const dayDiff = Math.abs((eventDate.getTime() - targetDate.getTime()) / (1000 * 60 * 60 * 24))
-        
-        if (dayDiff <= 3) { // Only very close days
-          nearbyJobs.push({
-            event,
-            distance: 999, // Mark as estimate
-            date: eventDate.toDateString()
-          })
-        }
-      })
-    }
+    // Since we can't calculate real distances without geocoding,
+    // only return events that are on the same day or very close days
+    // and mark them all as "distance unknown"
     
-    console.log(`Client-side found ${nearbyJobs.length} potential nearby jobs`)
+    const targetDate = new Date(needToBookEvent.start.dateTime || needToBookEvent.start.date || '')
+    
+    eventsWithLocations.forEach(event => {
+      const eventDate = new Date(event.start.dateTime || event.start.date || '')
+      const dayDiff = Math.abs((eventDate.getTime() - targetDate.getTime()) / (1000 * 60 * 60 * 24))
+      
+      // Only include events within 2 days to be conservative since we can't calculate real distance
+      if (dayDiff <= 2) {
+        nearbyJobs.push({
+          event,
+          distance: 999, // Use 999 to indicate this is an estimate/unknown distance
+          date: eventDate.toDateString()
+        })
+      }
+    })
+    
+    console.log(`Client-side found ${nearbyJobs.length} events within 2 days (distances unknown)`)
+    console.log('To get accurate distances, ensure Google Maps API key is configured properly')
+    
     return nearbyJobs
   }
 
