@@ -51,23 +51,37 @@ async function getCoordinatesFromAddress(address: string, apiKey: string): Promi
   try {
     const encodedAddress = encodeURIComponent(address)
     const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodedAddress}&key=${apiKey}`
-    console.log(`Geocoding URL: ${url}`)
+    console.log(`🗺️ Geocoding URL: ${url}`)
     
-    const response = await fetch(url)
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      },
+    })
+    
+    if (!response.ok) {
+      console.error(`❌ Geocoding API HTTP error: ${response.status} ${response.statusText}`)
+      return null
+    }
+    
     const data = await response.json()
     
-    console.log(`Geocoding response for "${address}":`, data)
+    console.log(`📍 Geocoding response for "${address}":`, data)
     
     if (data.status === 'OK' && data.results.length > 0) {
       const location = data.results[0].geometry.location
-      console.log(`Geocoded "${address}" to:`, location)
+      console.log(`✅ Geocoded "${address}" to:`, location)
       return { lat: location.lat, lng: location.lng }
     } else {
-      console.warn(`Geocoding failed for "${address}". Status: ${data.status}, Error: ${data.error_message || 'No error message'}`)
+      console.warn(`❌ Geocoding failed for "${address}". Status: ${data.status}, Error: ${data.error_message || 'No error message'}`)
+      if (data.status === 'REQUEST_DENIED') {
+        console.error('🔑 API Key issue: REQUEST_DENIED - Check your Google Maps API key and billing')
+      }
     }
     return null
   } catch (error) {
-    console.error('Error geocoding address:', error)
+    console.error('❌ Error geocoding address:', error)
     return null
   }
 }

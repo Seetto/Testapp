@@ -170,7 +170,12 @@ export default function NeedToBookPage() {
       
       // Fetch ALL calendar events for the week to search through
       const allEventsUrl = `/api/calendar/events?startDate=${searchStartDate.toISOString().split('T')[0]}`
-      const allEventsResponse = await fetch(allEventsUrl)
+      console.log('📅 Fetching events from:', allEventsUrl)
+      
+      const allEventsResponse = await fetch(allEventsUrl).catch(fetchError => {
+        console.error('❌ Events fetch failed:', fetchError)
+        throw new Error(`Failed to fetch calendar events: ${fetchError.message}`)
+      })
       
       if (!allEventsResponse.ok) {
         throw new Error('Failed to fetch calendar events for search')
@@ -181,6 +186,8 @@ export default function NeedToBookPage() {
       
       // Now create a comprehensive search request to find nearby jobs
       const searchUrl = `/api/calendar/need-to-book/search`
+      console.log('🔍 Making search request to:', searchUrl)
+      
       const searchResponse = await fetch(searchUrl, {
         method: 'POST',
         headers: {
@@ -192,6 +199,9 @@ export default function NeedToBookPage() {
           searchStartDate: searchStartDate.toISOString(),
           searchEndDate: searchEndDate.toISOString()
         })
+      }).catch(fetchError => {
+        console.error('❌ Search fetch failed:', fetchError)
+        throw new Error(`Network error: ${fetchError.message}`)
       })
       
       if (!searchResponse.ok) {
