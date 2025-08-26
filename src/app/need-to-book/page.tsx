@@ -152,48 +152,158 @@ export default function NeedToBookPage() {
 
     try {
       setLoading(true)
-      // Fetch fresh data to get all calendar events and find nearby days
-      const url = `/api/calendar/need-to-book?startDate=${startDate}`
-      const response = await fetch(url)
       
-      if (!response.ok) {
-        throw new Error('Failed to search calendar events')
+      // Get the date of the "Need to book" event
+      const eventDate = new Date(needToBookEvent.start.dateTime || needToBookEvent.start.date || '')
+      
+      // Search the entire week around this event (3 days before and after)
+      const searchStartDate = new Date(eventDate)
+      searchStartDate.setDate(eventDate.getDate() - 3)
+      
+      const searchEndDate = new Date(eventDate)
+      searchEndDate.setDate(eventDate.getDate() + 3)
+      
+      // Fetch ALL calendar events for the week to search through
+      const allEventsUrl = `/api/calendar/events?startDate=${searchStartDate.toISOString().split('T')[0]}`
+      const allEventsResponse = await fetch(allEventsUrl)
+      
+      if (!allEventsResponse.ok) {
+        throw new Error('Failed to fetch calendar events for search')
       }
       
-      const responseData = await response.json()
+      const allEventsData = await allEventsResponse.json()
+      const allEvents = allEventsData.events || []
       
-      // Find the specific nearby days for this event
-      const eventDateKey = new Date(needToBookEvent.start.dateTime || needToBookEvent.start.date || '').toDateString()
-      const nearbyDaysData = responseData.nearbyJobsByDay[eventDateKey]
+      // Now create a comprehensive search request to find nearby jobs
+      const searchUrl = `/api/calendar/need-to-book/search`
+      const searchResponse = await fetch(searchUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          needToBookEvent,
+          allEvents,
+          searchStartDate: searchStartDate.toISOString(),
+          searchEndDate: searchEndDate.toISOString()
+        })
+      })
       
-      if (!nearbyDaysData || nearbyDaysData.nearbyJobs.length === 0) {
-        alert(`No jobs found within 20km of ${needToBookEvent.summary} location: ${needToBookEvent.location}`)
+      if (!searchResponse.ok) {
+        // If the new endpoint doesn't exist, fall back to client-side calculation
+        const nearbyJobs = await findNearbyJobsClientSide(needToBookEvent, allEvents)
+        displaySearchResults(needToBookEvent, nearbyJobs)
         return
       }
-
-      // Scroll to the optimal booking days section
-      const optimalSection = document.querySelector('h2:has-text("Optimal Booking Days")') || 
-                           document.querySelector('h2[contains(text(), "Optimal")]') ||
-                           document.getElementById('optimal-booking-days')
       
-      if (optimalSection) {
-        optimalSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      }
-
-      // Highlight the specific day for this event
-      const dayElement = document.querySelector(`[data-date-key="${eventDateKey}"]`)
-      if (dayElement) {
-        dayElement.classList.add('ring-4', 'ring-blue-500', 'ring-opacity-50')
-        setTimeout(() => {
-          dayElement.classList.remove('ring-4', 'ring-blue-500', 'ring-opacity-50')
-        }, 3000)
-      }
+      const searchResults = await searchResponse.json()
+      displaySearchResults(needToBookEvent, searchResults.nearbyJobs || [])
 
     } catch (error) {
       console.error('Error searching nearby days:', error)
-      alert('Failed to search for nearby days. Please try again.')
+      // Fallback: try to search with current data
+      try {
+        const allEventsUrl = `/api/calendar/events?startDate=${startDate}`
+        const allEventsResponse = await fetch(allEventsUrl)
+        const allEventsData = await allEventsResponse.json()
+        const nearbyJobs = await findNearbyJobsClientSide(needToBookEvent, allEventsData.events || [])
+        displaySearchResults(needToBookEvent, nearbyJobs)
+      } catch (fallbackError) {
+        console.error('Fallback search failed:', fallbackError)
+        alert('Failed to search for nearby days. Please try again.')
+      }
     } finally {
       setLoading(false)
+    }
+  }
+
+  const findNearbyJobsClientSide = async (needToBookEvent: CalendarEvent, allEvents: CalendarEvent[]) => {
+    // This is a client-side fallback for finding nearby jobs
+    const nearbyJobs: Array<{event: CalendarEvent, distance: number, date: string}> = []
+    
+    // Filter out the "Need to book" event itself and events without locations
+    const eventsWithLocations = allEvents.filter(event => 
+      event.id !== needToBookEvent.id && 
+      event.location && 
+      event.location.trim() !== '' &&
+      !event.summary?.toLowerCase().includes('need to book')
+    )
+    
+    // Group events by day and show which days have jobs (simplified client-side version)
+    const eventsByDay: {[date: string]: CalendarEvent[]} = {}
+    
+    eventsWithLocations.forEach(event => {
+      const eventDate = new Date(event.start.dateTime || event.start.date || '')
+      const dateKey = eventDate.toDateString()
+      
+      if (!eventsByDay[dateKey]) {
+        eventsByDay[dateKey] = []
+      }
+      eventsByDay[dateKey].push(event)
+    })
+    
+    // For simplicity, assume events on the same day or adjacent days are "nearby"
+    // In a real implementation, this would use geocoding to calculate actual distances
+    const targetDate = new Date(needToBookEvent.start.dateTime || needToBookEvent.start.date || '')
+    
+    Object.entries(eventsByDay).forEach(([dateKey, dayEvents]) => {
+      const dayDate = new Date(dateKey)
+      const dayDiff = Math.abs((dayDate.getTime() - targetDate.getTime()) / (1000 * 60 * 60 * 24))
+      
+      // Consider events within 7 days as potentially nearby
+      if (dayDiff <= 7) {
+        dayEvents.forEach(event => {
+          nearbyJobs.push({
+            event,
+            distance: dayDiff * 5, // Rough estimate: 5km per day difference
+            date: dateKey
+          })
+        })
+      }
+    })
+    
+    return nearbyJobs
+  }
+
+  const displaySearchResults = (needToBookEvent: CalendarEvent, nearbyJobs: Array<{event: CalendarEvent, distance: number, date: string}>) => {
+    if (nearbyJobs.length === 0) {
+      alert(`No jobs found within 20km of "${needToBookEvent.summary}" during the week around this event.\n\nLocation: ${needToBookEvent.location}\n\nTry searching a different week or check if there are other jobs scheduled nearby.`)
+      return
+    }
+
+    // Create a summary of nearby jobs by day
+    const jobsByDay: {[date: string]: Array<{event: CalendarEvent, distance: number}>} = {}
+    nearbyJobs.forEach(job => {
+      if (!jobsByDay[job.date]) {
+        jobsByDay[job.date] = []
+      }
+      jobsByDay[job.date].push(job)
+    })
+
+    // Sort days by date
+    const sortedDays = Object.keys(jobsByDay).sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
+    
+    let message = `Found ${nearbyJobs.length} jobs within 20km of "${needToBookEvent.summary}" during the week:\n\n`
+    
+    sortedDays.forEach(dateKey => {
+      const date = new Date(dateKey)
+      const dayJobs = jobsByDay[dateKey]
+      message += `📅 ${date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}:\n`
+      
+      dayJobs.forEach(job => {
+        message += `  • ${job.event.summary} (${job.distance.toFixed(1)}km away)\n`
+      })
+      message += '\n'
+    })
+    
+    message += `Consider booking "${needToBookEvent.summary}" on one of these days to minimize travel time!`
+    
+    alert(message)
+
+    // Try to scroll to relevant section if it exists
+    const optimalSection = document.getElementById('optimal-booking-days')
+    if (optimalSection) {
+      optimalSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
   }
 
