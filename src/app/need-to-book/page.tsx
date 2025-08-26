@@ -84,9 +84,9 @@ export default function NeedToBookPage() {
         const calendars = calendarsData.calendars || []
         
         // Aggregate data from all calendars
-        let allNeedToBookEvents: CalendarEvent[] = []
-        let allNearbyJobsByDay: { [date: string]: any } = {}
-        let warnings: string[] = []
+        const allNeedToBookEvents: CalendarEvent[] = []
+        const allNearbyJobsByDay: { [date: string]: { needToBookEvent: CalendarEvent, nearbyJobs: Array<{ event: CalendarEvent, distance: number }> } } = {}
+        const warnings: string[] = []
         
         for (const calendar of calendars) {
           try {
