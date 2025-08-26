@@ -49,6 +49,7 @@ export default function NeedToBookPage() {
   const [searchResults, setSearchResults] = useState<{
     needToBookEvent: CalendarEvent
     nearbyJobs: Array<{event: CalendarEvent, distance: number, date: string}>
+    warning?: string
   } | null>(null)
   const [startDate, setStartDate] = useState<string>(() => {
     const today = new Date()
@@ -202,7 +203,7 @@ export default function NeedToBookPage() {
         
         // If the new endpoint doesn't exist, fall back to client-side calculation
         const nearbyJobs = await findNearbyJobsClientSide(needToBookEvent, allEvents)
-        displaySearchResults(needToBookEvent, nearbyJobs)
+        displaySearchResults(needToBookEvent, nearbyJobs, 'Using simplified search - Google Maps API unavailable')
         return
       }
       
@@ -213,7 +214,7 @@ export default function NeedToBookPage() {
         console.warn('Search API warning:', searchResults.warning)
       }
       
-      displaySearchResults(needToBookEvent, searchResults.nearbyJobs || [])
+      displaySearchResults(needToBookEvent, searchResults.nearbyJobs || [], searchResults.warning)
 
     } catch (error) {
       console.error('Error searching nearby days:', error)
@@ -223,7 +224,7 @@ export default function NeedToBookPage() {
         const allEventsResponse = await fetch(allEventsUrl)
         const allEventsData = await allEventsResponse.json()
         const nearbyJobs = await findNearbyJobsClientSide(needToBookEvent, allEventsData.events || [])
-        displaySearchResults(needToBookEvent, nearbyJobs)
+        displaySearchResults(needToBookEvent, nearbyJobs, 'Using fallback search - API connection failed')
       } catch (fallbackError) {
         console.error('Fallback search failed:', fallbackError)
         alert('Failed to search for nearby days. Please try again.')
@@ -276,14 +277,15 @@ export default function NeedToBookPage() {
     return nearbyJobs
   }
 
-  const displaySearchResults = (needToBookEvent: CalendarEvent, nearbyJobs: Array<{event: CalendarEvent, distance: number, date: string}>) => {
+  const displaySearchResults = (needToBookEvent: CalendarEvent, nearbyJobs: Array<{event: CalendarEvent, distance: number, date: string}>, warning?: string) => {
     if (nearbyJobs.length === 0) {
-      alert(`No jobs found within 20km of "${needToBookEvent.summary}" during the week around this event.\n\nLocation: ${needToBookEvent.location}\n\nTry searching a different week or check if there are other jobs scheduled nearby.`)
+      const warningText = warning ? `\n\nNote: ${warning}` : ''
+      alert(`No jobs found within 20km of "${needToBookEvent.summary}" during the week around this event.\n\nLocation: ${needToBookEvent.location}\n\nTry searching a different week or check if there are other jobs scheduled nearby.${warningText}`)
       return
     }
 
     // Set the search results to display in the modal
-    setSearchResults({ needToBookEvent, nearbyJobs })
+    setSearchResults({ needToBookEvent, nearbyJobs, warning })
 
     // Try to scroll to relevant section if it exists
     const optimalSection = document.getElementById('optimal-booking-days')
@@ -658,6 +660,27 @@ export default function NeedToBookPage() {
                   </button>
                 </div>
               </div>
+
+              {/* Warning Section */}
+              {searchResults.warning && (
+                <div className="px-6 py-3 bg-yellow-50 dark:bg-yellow-900/20 border-b border-yellow-200 dark:border-yellow-800">
+                  <div className="flex items-start space-x-2">
+                    <div className="text-yellow-600 dark:text-yellow-400 mt-0.5">
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                        Distance Estimation Notice
+                      </p>
+                      <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                        {searchResults.warning}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Modal Body */}
               <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">

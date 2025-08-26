@@ -90,8 +90,12 @@ export async function POST(request: Request) {
     // Try server-side key first, then fall back to public key
     const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
     
+    console.log('🔑 Checking Google Maps API key availability...')
+    console.log('🔍 GOOGLE_MAPS_API_KEY exists:', !!process.env.GOOGLE_MAPS_API_KEY)
+    console.log('🔍 NEXT_PUBLIC_GOOGLE_MAPS_API_KEY exists:', !!process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY)
+    
     if (!googleMapsApiKey) {
-      console.warn('Google Maps API key not found. Using simplified search.')
+      console.warn('❌ Google Maps API key not found. Using simplified search.')
       console.warn('Available env vars:', Object.keys(process.env).filter(k => k.includes('GOOGLE')))
       // Fallback to simplified search without exact distance calculations
       const nearbyJobs = performSimplifiedSearch(needToBookEvent, allEvents)
@@ -100,6 +104,8 @@ export async function POST(request: Request) {
         warning: 'Distance calculations unavailable - using simplified search. Configure GOOGLE_MAPS_API_KEY for accurate distances.' 
       })
     }
+    
+    console.log('✅ Google Maps API key found, attempting geocoding...')
 
     if (!needToBookEvent.location) {
       console.warn('Need to book event has no location')
@@ -107,14 +113,18 @@ export async function POST(request: Request) {
     }
 
     // Get coordinates for the "Need to book" event location
-    console.log(`Geocoding location: ${needToBookEvent.location}`)
+    console.log(`🗺️ Geocoding location: ${needToBookEvent.location}`)
     const needToBookCoords = await getCoordinatesFromAddress(needToBookEvent.location, googleMapsApiKey)
-    console.log('Geocoded coordinates:', needToBookCoords)
+    console.log('📍 Geocoded coordinates:', needToBookCoords)
     
     if (!needToBookCoords) {
-      console.warn(`Could not geocode location: ${needToBookEvent.location}`)
+      console.warn(`❌ Could not geocode location: ${needToBookEvent.location}`)
+      console.warn('🔧 Falling back to simplified search...')
       const nearbyJobs = performSimplifiedSearch(needToBookEvent, allEvents)
-      return NextResponse.json({ nearbyJobs })
+      return NextResponse.json({ 
+        nearbyJobs,
+        warning: 'Geocoding failed for target location - using simplified time-based search'
+      })
     }
 
     const nearbyJobs: Array<{event: CalendarEvent, distance: number, date: string}> = []
@@ -183,9 +193,11 @@ export async function POST(request: Request) {
 }
 
 function performSimplifiedSearch(needToBookEvent: CalendarEvent, allEvents: CalendarEvent[]): Array<{event: CalendarEvent, distance: number, date: string}> {
+  console.log('🔧 FALLBACK: Using simplified search - Google Maps geocoding unavailable')
   const nearbyJobs: Array<{event: CalendarEvent, distance: number, date: string}> = []
   
   const targetDate = new Date(needToBookEvent.start.dateTime || needToBookEvent.start.date || '')
+  console.log(`🎯 Target event date: ${targetDate.toISOString()}`)
   
   // Filter events and group by day
   const eventsToSearch = allEvents.filter(event => 
@@ -195,19 +207,30 @@ function performSimplifiedSearch(needToBookEvent: CalendarEvent, allEvents: Cale
     !event.summary?.toLowerCase().includes('need to book')
   )
 
+  console.log(`📋 Searching through ${eventsToSearch.length} events with locations`)
+
   eventsToSearch.forEach(event => {
     const eventDate = new Date(event.start.dateTime || event.start.date || '')
     const dayDiff = Math.abs((eventDate.getTime() - targetDate.getTime()) / (1000 * 60 * 60 * 24))
     
+    console.log(`📅 Event: "${event.summary}" on ${eventDate.toISOString()}`)
+    console.log(`⏰ Day difference: ${dayDiff.toFixed(4)} days`)
+    
     // Consider events within 7 days as potentially nearby (simplified approach)
     if (dayDiff <= 7) {
+      const estimatedDistance = Math.max(0.1, dayDiff * 10) // Improved estimate: 10km per day difference, minimum 0.1km
+      console.log(`✅ Adding job with estimated distance: ${estimatedDistance.toFixed(1)}km`)
+      
       nearbyJobs.push({
         event,
-        distance: dayDiff * 5, // Rough estimate: 5km per day difference
+        distance: estimatedDistance,
         date: eventDate.toDateString()
       })
+    } else {
+      console.log(`❌ Event too far in time: ${dayDiff.toFixed(2)} days > 7 days`)
     }
   })
   
+  console.log(`📊 Found ${nearbyJobs.length} nearby jobs using simplified search`)
   return nearbyJobs.sort((a, b) => a.distance - b.distance)
 }
