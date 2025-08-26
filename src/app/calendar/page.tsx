@@ -66,7 +66,11 @@ export default function CalendarPage() {
       }
       
       const data = await response.json()
-      setEvents(data.events || [])
+      // Filter out "Need to book" events from the main calendar view
+      const filteredEvents = (data.events || []).filter((event: CalendarEvent) => 
+        !event.summary || !event.summary.toLowerCase().includes('need to book')
+      )
+      setEvents(filteredEvents)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {

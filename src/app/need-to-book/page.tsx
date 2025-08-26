@@ -46,6 +46,10 @@ export default function NeedToBookPage() {
   const [data, setData] = useState<NearbyJobsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [searchResults, setSearchResults] = useState<{
+    needToBookEvent: CalendarEvent
+    nearbyJobs: Array<{event: CalendarEvent, distance: number, date: string}>
+  } | null>(null)
   const [startDate, setStartDate] = useState<string>(() => {
     const today = new Date()
     return today.toISOString().split('T')[0]
@@ -271,40 +275,18 @@ export default function NeedToBookPage() {
       return
     }
 
-    // Create a summary of nearby jobs by day
-    const jobsByDay: {[date: string]: Array<{event: CalendarEvent, distance: number}>} = {}
-    nearbyJobs.forEach(job => {
-      if (!jobsByDay[job.date]) {
-        jobsByDay[job.date] = []
-      }
-      jobsByDay[job.date].push(job)
-    })
-
-    // Sort days by date
-    const sortedDays = Object.keys(jobsByDay).sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
-    
-    let message = `Found ${nearbyJobs.length} jobs within 20km of "${needToBookEvent.summary}" during the week:\n\n`
-    
-    sortedDays.forEach(dateKey => {
-      const date = new Date(dateKey)
-      const dayJobs = jobsByDay[dateKey]
-      message += `📅 ${date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}:\n`
-      
-      dayJobs.forEach(job => {
-        message += `  • ${job.event.summary} (${job.distance.toFixed(1)}km away)\n`
-      })
-      message += '\n'
-    })
-    
-    message += `Consider booking "${needToBookEvent.summary}" on one of these days to minimize travel time!`
-    
-    alert(message)
+    // Set the search results to display in the modal
+    setSearchResults({ needToBookEvent, nearbyJobs })
 
     // Try to scroll to relevant section if it exists
     const optimalSection = document.getElementById('optimal-booking-days')
     if (optimalSection) {
       optimalSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
+  }
+
+  const closeSearchResults = () => {
+    setSearchResults(null)
   }
 
   const openGoogleMapsRoute = (destination: string) => {
@@ -642,6 +624,170 @@ export default function NeedToBookPage() {
               </div>
             )}
           </>
+        )}
+
+        {/* Search Results Modal */}
+        {searchResults && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+              {/* Modal Header */}
+              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-blue-50 dark:bg-blue-900/20">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-blue-800 dark:text-blue-200">
+                      🔍 Search Results for &quot;{searchResults.needToBookEvent.summary}&quot;
+                    </h3>
+                    <p className="text-sm text-blue-600 dark:text-blue-300 mt-1">
+                      Found {searchResults.nearbyJobs.length} jobs within 20km during the week
+                    </p>
+                  </div>
+                  <button
+                    onClick={closeSearchResults}
+                    className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-1"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+                {/* Need to Book Event Details */}
+                <div className="mb-6 p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
+                  <h4 className="font-medium text-orange-800 dark:text-orange-200 mb-2">
+                    📍 Event to Schedule:
+                  </h4>
+                  <div className="text-sm text-orange-700 dark:text-orange-300">
+                    <p className="font-medium">{searchResults.needToBookEvent.summary}</p>
+                    {searchResults.needToBookEvent.location && (
+                      <p className="mt-1">📍 {searchResults.needToBookEvent.location}</p>
+                    )}
+                    <p className="mt-1">📅 {formatEventDate(searchResults.needToBookEvent)}</p>
+                  </div>
+                </div>
+
+                {/* Nearby Jobs by Day */}
+                <div className="space-y-4">
+                  <h4 className="font-semibold text-gray-900 dark:text-white text-lg mb-4">
+                    📋 Nearby Jobs by Day:
+                  </h4>
+                  
+                  {(() => {
+                    // Group jobs by day
+                    const jobsByDay: {[date: string]: Array<{event: CalendarEvent, distance: number}>} = {}
+                    searchResults.nearbyJobs.forEach(job => {
+                      if (!jobsByDay[job.date]) {
+                        jobsByDay[job.date] = []
+                      }
+                      jobsByDay[job.date].push(job)
+                    })
+
+                    // Sort days by date
+                    const sortedDays = Object.keys(jobsByDay).sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
+                    
+                    return sortedDays.map(dateKey => {
+                      const date = new Date(dateKey)
+                      const dayJobs = jobsByDay[dateKey]
+                      
+                      return (
+                        <div key={dateKey} className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                          <h5 className="font-medium text-gray-900 dark:text-white mb-3 flex items-center">
+                            📅 {date.toLocaleDateString('en-US', { 
+                              weekday: 'long', 
+                              year: 'numeric', 
+                              month: 'long', 
+                              day: 'numeric' 
+                            })}
+                            <span className="ml-2 text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded-full">
+                              {dayJobs.length} job{dayJobs.length !== 1 ? 's' : ''}
+                            </span>
+                          </h5>
+                          
+                          <div className="space-y-3">
+                            {dayJobs.map((job, index) => (
+                              <div key={index} className="bg-white dark:bg-gray-800 rounded-md p-3 border border-gray-200 dark:border-gray-600">
+                                <div className="flex items-start justify-between">
+                                  <div className="flex-1">
+                                    <h6 className="font-medium text-gray-900 dark:text-white text-sm">
+                                      {job.event.summary || 'Untitled Event'}
+                                    </h6>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                      {formatEventDate(job.event)}
+                                    </p>
+                                    {job.event.location && (
+                                      <p className="text-xs text-gray-600 dark:text-gray-300 mt-1 flex items-center">
+                                        <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        </svg>
+                                        {job.event.location}
+                                      </p>
+                                    )}
+                                    {job.event.description && (
+                                      <p className="text-xs text-gray-600 dark:text-gray-300 mt-2 line-clamp-2">
+                                        {job.event.description}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <div className="ml-4 flex flex-col items-end space-y-2">
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                      {job.distance.toFixed(1)}km away
+                                    </span>
+                                    <div className="flex space-x-1">
+                                      <button
+                                        onClick={() => openInGoogleCalendar(job.event)}
+                                        className="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs font-medium transition-colors"
+                                        title="View in Calendar"
+                                      >
+                                        📅
+                                      </button>
+                                      {job.event.location && (
+                                        <button
+                                          onClick={() => openGoogleMapsRoute(job.event.location!)}
+                                          className="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs font-medium transition-colors"
+                                          title="Get Directions"
+                                        >
+                                          🗺️
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })
+                  })()}
+                </div>
+
+                {/* Recommendation */}
+                <div className="mt-6 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                  <h4 className="font-medium text-green-800 dark:text-green-200 mb-2">
+                    💡 Scheduling Recommendation:
+                  </h4>
+                  <p className="text-sm text-green-700 dark:text-green-300">
+                    Consider booking &quot;{searchResults.needToBookEvent.summary}&quot; on one of the days above to minimize travel time and maximize efficiency!
+                  </p>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700">
+                <div className="flex justify-end">
+                  <button
+                    onClick={closeSearchResults}
+                    className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>
