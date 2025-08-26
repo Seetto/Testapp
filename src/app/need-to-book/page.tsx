@@ -223,6 +223,7 @@ export default function NeedToBookPage() {
 
   const findNearbyJobsClientSide = async (needToBookEvent: CalendarEvent, allEvents: CalendarEvent[]) => {
     // This is a client-side fallback for finding nearby jobs
+    console.log('Using client-side fallback distance calculation')
     const nearbyJobs: Array<{event: CalendarEvent, distance: number, date: string}> = []
     
     // Filter out the "Need to book" event itself and events without locations
@@ -233,39 +234,43 @@ export default function NeedToBookPage() {
       !event.summary?.toLowerCase().includes('need to book')
     )
     
-    // Group events by day and show which days have jobs (simplified client-side version)
-    const eventsByDay: {[date: string]: CalendarEvent[]} = {}
+    console.log(`Client-side searching through ${eventsWithLocations.length} events`)
     
-    eventsWithLocations.forEach(event => {
-      const eventDate = new Date(event.start.dateTime || event.start.date || '')
-      const dateKey = eventDate.toDateString()
-      
-      if (!eventsByDay[dateKey]) {
-        eventsByDay[dateKey] = []
-      }
-      eventsByDay[dateKey].push(event)
-    })
-    
-    // For simplicity, assume events on the same day or adjacent days are "nearby"
-    // In a real implementation, this would use geocoding to calculate actual distances
-    const targetDate = new Date(needToBookEvent.start.dateTime || needToBookEvent.start.date || '')
-    
-    Object.entries(eventsByDay).forEach(([dateKey, dayEvents]) => {
-      const dayDate = new Date(dateKey)
-      const dayDiff = Math.abs((dayDate.getTime() - targetDate.getTime()) / (1000 * 60 * 60 * 24))
-      
-      // Consider events within 7 days as potentially nearby
-      if (dayDiff <= 7) {
-        dayEvents.forEach(event => {
+    // Try to use browser's geolocation API for better distance estimates
+    if (navigator.geolocation && 'geolocation' in navigator) {
+      // For now, just return all events with a warning that distances are estimates
+      eventsWithLocations.forEach(event => {
+        const eventDate = new Date(event.start.dateTime || event.start.date || '')
+        const targetDate = new Date(needToBookEvent.start.dateTime || needToBookEvent.start.date || '')
+        const dayDiff = Math.abs((eventDate.getTime() - targetDate.getTime()) / (1000 * 60 * 60 * 24))
+        
+        // Only include events within 7 days and mark distance as estimated
+        if (dayDiff <= 7) {
           nearbyJobs.push({
             event,
-            distance: dayDiff * 5, // Rough estimate: 5km per day difference
-            date: dateKey
+            distance: 999, // Use 999 to indicate this is an estimate/unknown distance
+            date: eventDate.toDateString()
           })
-        })
-      }
-    })
+        }
+      })
+    } else {
+      // Very basic fallback
+      eventsWithLocations.forEach(event => {
+        const eventDate = new Date(event.start.dateTime || event.start.date || '')
+        const targetDate = new Date(needToBookEvent.start.dateTime || needToBookEvent.start.date || '')
+        const dayDiff = Math.abs((eventDate.getTime() - targetDate.getTime()) / (1000 * 60 * 60 * 24))
+        
+        if (dayDiff <= 3) { // Only very close days
+          nearbyJobs.push({
+            event,
+            distance: 999, // Mark as estimate
+            date: eventDate.toDateString()
+          })
+        }
+      })
+    }
     
+    console.log(`Client-side found ${nearbyJobs.length} potential nearby jobs`)
     return nearbyJobs
   }
 
@@ -732,8 +737,12 @@ export default function NeedToBookPage() {
                                     )}
                                   </div>
                                   <div className="ml-4 flex flex-col items-end space-y-2">
-                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                                      {job.distance.toFixed(1)}km away
+                                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                                      job.distance === 999 
+                                        ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' 
+                                        : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                    }`}>
+                                      {job.distance === 999 ? 'Distance unknown' : `${job.distance.toFixed(1)}km away`}
                                     </span>
                                     <div className="flex space-x-1">
                                       <button

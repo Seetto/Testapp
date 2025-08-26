@@ -50,14 +50,20 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 async function getCoordinatesFromAddress(address: string, apiKey: string): Promise<{lat: number, lng: number} | null> {
   try {
     const encodedAddress = encodeURIComponent(address)
-    const response = await fetch(
-      `https://maps.googleapis.com/maps/api/geocode/json?address=${encodedAddress}&key=${apiKey}`
-    )
+    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodedAddress}&key=${apiKey}`
+    console.log(`Geocoding URL: ${url}`)
+    
+    const response = await fetch(url)
     const data = await response.json()
+    
+    console.log(`Geocoding response for "${address}":`, data)
     
     if (data.status === 'OK' && data.results.length > 0) {
       const location = data.results[0].geometry.location
+      console.log(`Geocoded "${address}" to:`, location)
       return { lat: location.lat, lng: location.lng }
+    } else {
+      console.warn(`Geocoding failed for "${address}". Status: ${data.status}, Error: ${data.error_message || 'No error message'}`)
     }
     return null
   } catch (error) {
@@ -78,23 +84,33 @@ export async function POST(request: Request) {
     const { needToBookEvent, allEvents, searchStartDate, searchEndDate } = searchRequest
 
     console.log(`Searching for jobs near "${needToBookEvent.summary}" from ${searchStartDate} to ${searchEndDate}`)
+    console.log(`Need to book location: ${needToBookEvent.location}`)
     
     // For distance calculations, we need Google Maps API key
-    const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+    // Try server-side key first, then fall back to public key
+    const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
     
     if (!googleMapsApiKey) {
       console.warn('Google Maps API key not found. Using simplified search.')
+      console.warn('Available env vars:', Object.keys(process.env).filter(k => k.includes('GOOGLE')))
       // Fallback to simplified search without exact distance calculations
       const nearbyJobs = performSimplifiedSearch(needToBookEvent, allEvents)
-      return NextResponse.json({ nearbyJobs })
+      return NextResponse.json({ 
+        nearbyJobs, 
+        warning: 'Distance calculations unavailable - using simplified search. Configure GOOGLE_MAPS_API_KEY for accurate distances.' 
+      })
     }
 
     if (!needToBookEvent.location) {
+      console.warn('Need to book event has no location')
       return NextResponse.json({ nearbyJobs: [] })
     }
 
     // Get coordinates for the "Need to book" event location
+    console.log(`Geocoding location: ${needToBookEvent.location}`)
     const needToBookCoords = await getCoordinatesFromAddress(needToBookEvent.location, googleMapsApiKey)
+    console.log('Geocoded coordinates:', needToBookCoords)
+    
     if (!needToBookCoords) {
       console.warn(`Could not geocode location: ${needToBookEvent.location}`)
       const nearbyJobs = performSimplifiedSearch(needToBookEvent, allEvents)
@@ -114,15 +130,24 @@ export async function POST(request: Request) {
     console.log(`Searching through ${eventsToSearch.length} events with locations`)
 
     for (const event of eventsToSearch) {
+      console.log(`Geocoding event: ${event.summary} at ${event.location}`)
+      
       // Get coordinates for this event
       const eventCoords = await getCoordinatesFromAddress(event.location!, googleMapsApiKey)
-      if (!eventCoords) continue
+      if (!eventCoords) {
+        console.log(`Could not geocode: ${event.location}`)
+        continue
+      }
+
+      console.log(`Event coordinates: ${eventCoords.lat}, ${eventCoords.lng}`)
 
       // Calculate distance
       const distance = calculateDistance(
         needToBookCoords.lat, needToBookCoords.lng,
         eventCoords.lat, eventCoords.lng
       )
+
+      console.log(`Distance calculated: ${distance.toFixed(2)}km between ${needToBookEvent.location} and ${event.location}`)
 
       // Only include events within 20km
       if (distance <= 20) {
@@ -132,6 +157,9 @@ export async function POST(request: Request) {
           distance,
           date: eventDate.toDateString()
         })
+        console.log(`Added nearby job: ${event.summary} (${distance.toFixed(2)}km)`)
+      } else {
+        console.log(`Event too far: ${distance.toFixed(2)}km > 20km`)
       }
     }
 

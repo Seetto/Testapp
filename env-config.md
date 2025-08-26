@@ -11,6 +11,7 @@ NEXTAUTH_URL=https://testapp-git-main-steel2xs-3124s-projects.vercel.app
 NEXTAUTH_SECRET=your-secret-key-here
 GOOGLE_CLIENT_ID=your-google-client-id
 GOOGLE_CLIENT_SECRET=your-google-client-secret
+GOOGLE_MAPS_API_KEY=your-google-maps-api-key-here
 NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your-google-maps-api-key-here
 ```
 
@@ -20,6 +21,7 @@ NEXTAUTH_URL=http://localhost:3000
 NEXTAUTH_SECRET=your-secret-key-here
 GOOGLE_CLIENT_ID=your-google-client-id
 GOOGLE_CLIENT_SECRET=your-google-client-secret
+GOOGLE_MAPS_API_KEY=your-google-maps-api-key-here
 NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your-google-maps-api-key-here
 ```
 
