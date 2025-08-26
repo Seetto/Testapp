@@ -144,6 +144,59 @@ export default function NeedToBookPage() {
     })}`
   }
 
+  const searchNearbyDays = async (needToBookEvent: CalendarEvent) => {
+    if (!needToBookEvent.location) {
+      alert('This event does not have a location to search around.')
+      return
+    }
+
+    try {
+      setLoading(true)
+      // Fetch fresh data to get all calendar events and find nearby days
+      const url = `/api/calendar/need-to-book?startDate=${startDate}`
+      const response = await fetch(url)
+      
+      if (!response.ok) {
+        throw new Error('Failed to search calendar events')
+      }
+      
+      const responseData = await response.json()
+      
+      // Find the specific nearby days for this event
+      const eventDateKey = new Date(needToBookEvent.start.dateTime || needToBookEvent.start.date || '').toDateString()
+      const nearbyDaysData = responseData.nearbyJobsByDay[eventDateKey]
+      
+      if (!nearbyDaysData || nearbyDaysData.nearbyJobs.length === 0) {
+        alert(`No jobs found within 20km of ${needToBookEvent.summary} location: ${needToBookEvent.location}`)
+        return
+      }
+
+      // Scroll to the optimal booking days section
+      const optimalSection = document.querySelector('h2:has-text("Optimal Booking Days")') || 
+                           document.querySelector('h2[contains(text(), "Optimal")]') ||
+                           document.getElementById('optimal-booking-days')
+      
+      if (optimalSection) {
+        optimalSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+
+      // Highlight the specific day for this event
+      const dayElement = document.querySelector(`[data-date-key="${eventDateKey}"]`)
+      if (dayElement) {
+        dayElement.classList.add('ring-4', 'ring-blue-500', 'ring-opacity-50')
+        setTimeout(() => {
+          dayElement.classList.remove('ring-4', 'ring-blue-500', 'ring-opacity-50')
+        }, 3000)
+      }
+
+    } catch (error) {
+      console.error('Error searching nearby days:', error)
+      alert('Failed to search for nearby days. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const openGoogleMapsRoute = (destination: string) => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -323,14 +376,13 @@ export default function NeedToBookPage() {
                                 </button>
                                 {event.location && (
                                   <button
-                                    onClick={() => openGoogleMapsRoute(event.location!)}
-                                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors flex items-center space-x-1"
+                                    onClick={() => searchNearbyDays(event)}
+                                    className="bg-orange-600 hover:bg-orange-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors flex items-center space-x-1"
                                   >
                                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                     </svg>
-                                    <span>Get Directions</span>
+                                    <span>Search</span>
                                   </button>
                                 )}
                               </div>
@@ -346,7 +398,7 @@ export default function NeedToBookPage() {
 
             {/* Events with nearby jobs */}
             {Object.keys(data.nearbyJobsByDay).length > 0 && (
-              <div className="mb-8">
+              <div className="mb-8" id="optimal-booking-days">
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
                   Optimal Booking Days - Jobs Within 20km ({Object.keys(data.nearbyJobsByDay).length} opportunities)
                 </h2>
@@ -354,7 +406,7 @@ export default function NeedToBookPage() {
                   {Object.entries(data.nearbyJobsByDay)
                     .sort(([a], [b]) => new Date(a).getTime() - new Date(b).getTime())
                     .map(([dateKey, dayData]) => (
-                      <div key={dateKey} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                      <div key={dateKey} data-date-key={dateKey} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
                         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-green-50 dark:bg-green-900/20">
                           <h3 className="text-lg font-semibold text-green-800 dark:text-green-200">
                             📍 {new Date(dateKey).toLocaleDateString('en-US', {
