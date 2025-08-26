@@ -49,7 +49,7 @@ export default function CalendarPage() {
     if ((session as ExtendedSession)?.accessToken) {
       fetchCalendarEvents()
     }
-  }, [session, startDate])
+  }, [session, startDate]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchCalendarEvents = async () => {
     try {
