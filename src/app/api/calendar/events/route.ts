@@ -26,7 +26,7 @@ interface CalendarEvent {
   htmlLink: string
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions) as ExtendedSession | null
     
@@ -38,6 +38,10 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Get start date from URL parameters
+    const { searchParams } = new URL(request.url)
+    const startDateParam = searchParams.get('startDate')
+    
     // Create OAuth2 client
     const oauth2Client = new google.auth.OAuth2()
     oauth2Client.setCredentials({
@@ -47,18 +51,23 @@ export async function GET() {
     // Create Calendar API client
     const calendar = google.calendar({ version: 'v3', auth: oauth2Client })
 
-    // Get calendar events from 30 days ago to 30 days in the future
-    const now = new Date()
-    const thirtyDaysAgo = new Date()
-    thirtyDaysAgo.setDate(now.getDate() - 30)
-    const thirtyDaysFromNow = new Date()
-    thirtyDaysFromNow.setDate(now.getDate() + 30)
+    // Set date range based on start date parameter or default to today
+    const startDate = startDateParam ? new Date(startDateParam) : new Date()
+    // Set start to beginning of the day
+    startDate.setHours(0, 0, 0, 0)
+    
+    // Get events up to 90 days from start date to ensure we have enough events
+    const endDate = new Date(startDate)
+    endDate.setDate(startDate.getDate() + 90)
 
     console.log('Calling Google Calendar API...')
+    console.log('Start date:', startDate.toISOString())
+    console.log('End date:', endDate.toISOString())
+    
     const response = await calendar.events.list({
       calendarId: 'primary',
-      timeMin: thirtyDaysAgo.toISOString(),
-      timeMax: thirtyDaysFromNow.toISOString(),
+      timeMin: startDate.toISOString(),
+      timeMax: endDate.toISOString(),
       maxResults: 100,
       singleEvents: true,
       orderBy: 'startTime',
