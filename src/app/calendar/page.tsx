@@ -486,22 +486,6 @@ export default function CalendarPage() {
       }
     })
     
-    // Add nearby jobs for this date when nearby jobs are enabled
-    if (showNearbyJobs && needToBookData) {
-      Object.entries(needToBookData.nearbyJobsByDay).forEach(([dateKey, dayData]) => {
-        if (dateKey === dateString) {
-          const typedDayData = dayData as { needToBookEvent: CalendarEvent; nearbyJobs: Array<{ event: CalendarEvent; distance: number }> }
-          typedDayData.nearbyJobs.forEach(({ event }: { event: CalendarEvent; distance: number }) => {
-            // Only add if not already in the list (avoid duplicates)
-            if (!eventsForDate.some(existingEvent => existingEvent.id === event.id)) {
-              console.log(`Adding nearby job to calendar: ${event.summary} on ${dateString}`)
-              eventsForDate.push(event)
-            }
-          })
-        }
-      })
-    }
-    
     return eventsForDate
   }
 
@@ -510,19 +494,17 @@ export default function CalendarPage() {
       return false
     }
     
-    // Use ISO date string (YYYY-MM-DD) for consistent comparison with API
-    const dateString = date.toISOString().split('T')[0]
+    // Get the event's actual date (not the date we're currently rendering)
+    const eventDate = new Date(event.start.dateTime || event.start.date || '')
+    const eventDateString = eventDate.toISOString().split('T')[0]
     
-    // Check if this event is a nearby job for ANY need-to-book event on this date
+    // Check if this event is a nearby job for ANY need-to-book event on the event's actual date
     const result = Object.entries(needToBookData.nearbyJobsByDay).some(([dateKey, dayData]) => {
-      if (dateKey === dateString) {
+      if (dateKey === eventDateString) {
         const typedDayData = dayData as { needToBookEvent: CalendarEvent; nearbyJobs: Array<{ event: CalendarEvent; distance: number }> }
         
         // Check if this event is a nearby job for this day
         const isNearby = typedDayData.nearbyJobs.some(({ event: nearbyEvent }) => nearbyEvent.id === event.id)
-        if (isNearby) {
-          console.log(`Found nearby job: ${event.summary} on ${dateString}`)
-        }
         return isNearby
       }
       return false
@@ -536,12 +518,13 @@ export default function CalendarPage() {
       return 0
     }
     
-    // Use ISO date string (YYYY-MM-DD) for consistent comparison with API
-    const dateString = date.toISOString().split('T')[0]
+    // Get the event's actual date (not the date we're currently rendering)
+    const eventDate = new Date(event.start.dateTime || event.start.date || '')
+    const eventDateString = eventDate.toISOString().split('T')[0]
     
     // Find the distance for this nearby job
     for (const [dateKey, dayData] of Object.entries(needToBookData.nearbyJobsByDay)) {
-      if (dateKey === dateString) {
+      if (dateKey === eventDateString) {
         const typedDayData = dayData as { needToBookEvent: CalendarEvent; nearbyJobs: Array<{ event: CalendarEvent; distance: number }> }
         const nearbyJob = typedDayData.nearbyJobs.find(({ event: nearbyEvent }) => nearbyEvent.id === event.id)
         if (nearbyJob) {
