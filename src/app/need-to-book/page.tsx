@@ -444,7 +444,7 @@ export default function NeedToBookPage() {
                       onChange={(e) => setSelectedNeedToBookEvent(e.target.value)}
                       className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
-                      <option value="">Select a "Need to book" event</option>
+                      <option value="">Select a &quot;Need to book&quot; event</option>
                       {data.needToBookEvents.map((event) => (
                         <option key={event.id} value={event.id}>
                           {event.summary} - {new Date(event.start.dateTime || event.start.date || '').toLocaleDateString()}
@@ -556,7 +556,7 @@ export default function NeedToBookPage() {
                       const topOffset = (startTime.getMinutes() / 60) * 64 // 64px = 1 hour height
                       const height = Math.max(duration * 64, 20) // minimum height of 20px
                       
-                      // Determine if this is a "need to book" event
+                      // Determine if this is a &quot;need to book&quot; event
                       const isNeedToBook = data.needToBookEvents.some(ntbEvent => ntbEvent.id === event.id)
                       const backgroundColor = isNeedToBook ? '#f97316' : (event.backgroundColor || '#4285f4')
                       

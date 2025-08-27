@@ -40,6 +40,7 @@ interface NearbyJobsResponse {
 }
 
 // Function to get coordinates from address using Google Geocoding API
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function getCoordinatesFromAddress(address: string, apiKey: string): Promise<{lat: number, lng: number} | null> {
   try {
     const encodedAddress = encodeURIComponent(address)
