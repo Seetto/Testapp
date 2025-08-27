@@ -38,7 +38,7 @@ export default function CalendarPage() {
   const [error, setError] = useState<string | null>(null)
   const [completedJobs, setCompletedJobs] = useState<Set<string>>(new Set())
   const [selectedCalendarId, setSelectedCalendarId] = useState<string>('all')
-  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar')
   const [startDate, setStartDate] = useState<string>(() => {
     // Default to today's date in YYYY-MM-DD format
     const today = new Date()
