@@ -659,7 +659,7 @@ export default function CalendarPage() {
               </div>
               
               <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 rounded" style={{ backgroundColor: 'rgba(255, 255, 0, 0.3)' }}></div>
+                <div className="w-3 h-3 rounded border-2 border-yellow-400" style={{ backgroundColor: 'transparent' }}></div>
                 <span className="text-xs text-gray-600 dark:text-gray-400">Nearby Jobs (highlighted)</span>
               </div>
             </div>
@@ -727,13 +727,9 @@ export default function CalendarPage() {
                        const isNearbyJobEvent = isNearbyJob(event, date)
                        const distance = getNearbyJobDistance(event, date)
 
-                      // Use original Google Calendar colors for all events, but highlight nearby jobs with yellow background
-                      let backgroundColor = event.backgroundColor || '#4285f4'
-                      if (isNearbyJobEvent) {
-                        // Overlay yellow background for nearby jobs
-                        backgroundColor = 'rgba(255, 255, 0, 0.3)'
-                      }
-                      const borderStyle = 'none'
+                      // Use original Google Calendar colors for all events, but highlight nearby jobs with yellow border
+                      const backgroundColor = event.backgroundColor || '#4285f4'
+                      const borderStyle = isNearbyJobEvent ? '3px solid #f59e0b' : 'none' // Yellow border for nearby jobs
 
                       return (
                         <div
@@ -948,15 +944,12 @@ export default function CalendarPage() {
                         const distance = getNearbyJobDistance(event, date)
                         
                         return (
-                          <div 
-                            key={event.id} 
-                            className={`px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${
-                              isNearbyJobEvent ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''
-                            }`}
-                            style={{
-                              backgroundColor: isNearbyJobEvent ? 'rgba(255, 255, 0, 0.1)' : undefined
-                            }}
-                          >
+                                                     <div 
+                             key={event.id} 
+                             className={`px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${
+                               isNearbyJobEvent ? 'border-l-4 border-yellow-400' : ''
+                             }`}
+                           >
                           <div className="flex items-start space-x-3">
                             <div 
                               className="flex-shrink-0 w-2 h-2 rounded-full mt-2"
