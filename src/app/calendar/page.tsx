@@ -31,6 +31,13 @@ interface CalendarEvent {
   foregroundColor?: string
 }
 
+interface CalendarData {
+  id: string
+  summary: string
+  backgroundColor?: string
+  foregroundColor?: string
+}
+
 interface NearbyJobsResponse {
   needToBookEvents: CalendarEvent[]
   nearbyJobsByDay: {
@@ -90,7 +97,7 @@ export default function CalendarPage() {
       if (calendarsResponse.ok) {
         const calendarsData = await calendarsResponse.json()
         const colors: { [key: string]: string } = {}
-        calendarsData.calendars?.forEach((calendar: any) => {
+        calendarsData.calendars?.forEach((calendar: CalendarData) => {
           colors[calendar.id] = calendar.backgroundColor || '#4285f4'
         })
         setCalendarColors(colors)
@@ -116,7 +123,7 @@ export default function CalendarPage() {
           nearbyJobsByDay: {}
         }
         
-        for (const calendar of calendars) {
+        for (const calendar of calendars as CalendarData[]) {
           try {
             const url = `/api/calendar/need-to-book?startDate=${startDate}&calendarId=${encodeURIComponent(calendar.id)}`
             const response = await fetch(url)
@@ -169,7 +176,7 @@ export default function CalendarPage() {
         
         // Fetch events from each calendar
         const allEvents: CalendarEvent[] = []
-        for (const calendar of calendars) {
+        for (const calendar of calendars as CalendarData[]) {
           try {
             const url = `/api/calendar/events?startDate=${startDate}&calendarId=${encodeURIComponent(calendar.id)}`
             const response = await fetch(url)
