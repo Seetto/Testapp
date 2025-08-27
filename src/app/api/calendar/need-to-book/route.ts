@@ -39,20 +39,6 @@ interface NearbyJobsResponse {
   }
 }
 
-// Function to calculate distance between two coordinates using Haversine formula
-function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371 // Radius of the Earth in kilometers
-  const dLat = (lat2 - lat1) * Math.PI / 180
-  const dLon = (lon2 - lon1) * Math.PI / 180
-  const a = 
-    Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-    Math.sin(dLon/2) * Math.sin(dLon/2)
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
-  const distance = R * c // Distance in kilometers
-  return distance
-}
-
 // Function to get coordinates from address using Google Geocoding API
 async function getCoordinatesFromAddress(address: string, apiKey: string): Promise<{lat: number, lng: number} | null> {
   try {
@@ -69,6 +55,38 @@ async function getCoordinatesFromAddress(address: string, apiKey: string): Promi
     return null
   } catch (error) {
     console.error('Error geocoding address:', error)
+    return null
+  }
+}
+
+// Function to get driving distance using Google Distance Matrix API
+async function getDrivingDistance(
+  origin: string, 
+  destination: string, 
+  apiKey: string
+): Promise<number | null> {
+  try {
+    const encodedOrigin = encodeURIComponent(origin)
+    const encodedDestination = encodeURIComponent(destination)
+    
+    const response = await fetch(
+      `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodedOrigin}&destinations=${encodedDestination}&mode=driving&key=${apiKey}`
+    )
+    
+    const data = await response.json()
+    
+    if (data.status === 'OK' && data.rows.length > 0 && data.rows[0].elements.length > 0) {
+      const element = data.rows[0].elements[0]
+      if (element.status === 'OK') {
+        // Distance is returned in meters, convert to kilometers
+        return element.distance.value / 1000
+      }
+    }
+    
+    console.warn(`Distance Matrix API returned status: ${data.status} for ${origin} to ${destination}`)
+    return null
+  } catch (error) {
+    console.error('Error getting driving distance:', error)
     return null
   }
 }
@@ -125,7 +143,7 @@ export async function GET(request: Request) {
     console.log(`Found ${needToBookEvents.length} "Need to book" events out of ${allEvents.length} total events`)
 
     // For distance calculations, we need Google Maps API key
-    const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+    const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
     
     if (!googleMapsApiKey) {
       console.warn('Google Maps API key not found. Distance calculations will be disabled.')
@@ -142,9 +160,7 @@ export async function GET(request: Request) {
     for (const needToBookEvent of needToBookEvents) {
       if (!needToBookEvent.location) continue
 
-      // Get coordinates for the "Need to book" event location
-      const needToBookCoords = await getCoordinatesFromAddress(needToBookEvent.location, googleMapsApiKey)
-      if (!needToBookCoords) continue
+      console.log(`Processing need-to-book event: ${needToBookEvent.summary} at ${needToBookEvent.location}`)
 
       // Get all events on the same day or nearby days
       const eventDate = new Date(needToBookEvent.start.dateTime || needToBookEvent.start.date || '')
@@ -165,18 +181,17 @@ export async function GET(request: Request) {
         // Only consider events within 7 days
         if (dayDifference > 7) continue
 
-        // Get coordinates for this event
-        const eventCoords = await getCoordinatesFromAddress(event.location, googleMapsApiKey)
-        if (!eventCoords) continue
+        console.log(`Checking event: ${event.summary} at ${event.location} (${dayDifference} days difference)`)
 
-        // Calculate distance
-        const distance = calculateDistance(
-          needToBookCoords.lat, needToBookCoords.lng,
-          eventCoords.lat, eventCoords.lng
+        // Get driving distance using Google Distance Matrix API
+        const distance = await getDrivingDistance(
+          needToBookEvent.location,
+          event.location,
+          googleMapsApiKey
         )
 
-        // Only include events within 20km
-        if (distance <= 20) {
+        if (distance !== null && distance <= 20) {
+          console.log(`Found nearby job: ${event.summary} - ${distance.toFixed(1)}km away`)
           nearbyEvents.push({ event, distance })
         }
       }
@@ -185,10 +200,13 @@ export async function GET(request: Request) {
       nearbyEvents.sort((a, b) => a.distance - b.distance)
 
       if (nearbyEvents.length > 0) {
+        console.log(`Found ${nearbyEvents.length} nearby jobs for ${needToBookEvent.summary}`)
         nearbyJobsByDay[dayKey] = {
           needToBookEvent,
           nearbyJobs: nearbyEvents
         }
+      } else {
+        console.log(`No nearby jobs found for ${needToBookEvent.summary}`)
       }
     }
 
@@ -197,6 +215,7 @@ export async function GET(request: Request) {
       nearbyJobsByDay
     }
 
+    console.log(`Final result: ${Object.keys(nearbyJobsByDay).length} days with nearby jobs`)
     return NextResponse.json(result)
   } catch (error: unknown) {
     console.error('Need to book API error:', error)
