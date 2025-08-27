@@ -109,7 +109,6 @@ export default function CalendarPage() {
 
   const fetchNeedToBookData = async () => {
     try {
-      console.log('Fetching need-to-book data...')
       if (selectedCalendarId === 'all') {
         // Fetch from all calendars
         const calendarsResponse = await fetch('/api/calendar/calendars')
@@ -119,8 +118,6 @@ export default function CalendarPage() {
         const calendarsData = await calendarsResponse.json()
         const calendars = calendarsData.calendars || []
         
-        console.log('Fetching from all calendars:', calendars.map((c: CalendarData) => c.summary))
-        
         const allNeedToBookData: NearbyJobsResponse = {
           needToBookEvents: [],
           nearbyJobsByDay: {}
@@ -129,11 +126,9 @@ export default function CalendarPage() {
         for (const calendar of calendars as CalendarData[]) {
           try {
             const url = `/api/calendar/need-to-book?startDate=${startDate}&calendarId=${encodeURIComponent(calendar.id)}`
-            console.log(`Fetching from calendar ${calendar.summary}: ${url}`)
             const response = await fetch(url)
             if (response.ok) {
               const data = await response.json()
-              console.log(`Calendar ${calendar.summary} returned:`, data)
               allNeedToBookData.needToBookEvents.push(...(data.needToBookEvents || []))
               Object.assign(allNeedToBookData.nearbyJobsByDay, data.nearbyJobsByDay || {})
             }
@@ -142,7 +137,6 @@ export default function CalendarPage() {
           }
         }
         
-        console.log('Combined need-to-book data:', allNeedToBookData)
         setNeedToBookData(allNeedToBookData)
         // Set first need-to-book event as default selection
         if (allNeedToBookData.needToBookEvents.length > 0 && !selectedNeedToBookEvent) {
@@ -151,12 +145,10 @@ export default function CalendarPage() {
       } else {
         // Fetch from specific calendar
         const url = `/api/calendar/need-to-book?startDate=${startDate}&calendarId=${encodeURIComponent(selectedCalendarId)}`
-        console.log(`Fetching from specific calendar: ${url}`)
         const response = await fetch(url)
         
         if (response.ok) {
           const data = await response.json()
-          console.log('Specific calendar need-to-book data:', data)
           setNeedToBookData(data)
           // Set first need-to-book event as default selection
           if (data.needToBookEvents?.length > 0 && !selectedNeedToBookEvent) {
@@ -477,61 +469,43 @@ export default function CalendarPage() {
     const dateString = date.toISOString().split('T')[0]
     const eventsForDate: CalendarEvent[] = []
     
-    console.log(`Getting events for date: ${dateString}`)
-    
     // Add regular calendar events for this date
     events.forEach((event: CalendarEvent) => {
       const eventDate = new Date(event.start.dateTime || event.start.date || '')
       const eventDateString = eventDate.toISOString().split('T')[0]
       
       if (eventDateString === dateString) {
-        console.log(`Found event for ${dateString}: ${event.summary}`)
         eventsForDate.push(event)
       }
     })
-    
-    console.log(`Total events for ${dateString}: ${eventsForDate.length}`)
     return eventsForDate
   }
 
   const isNearbyJob = (event: CalendarEvent, date: Date) => {
-    if (!showNearbyJobs || !needToBookData || !selectedNeedToBookEvent) {
+    if (!showNearbyJobs || !needToBookData) {
       return false
     }
     
     // Use ISO date string (YYYY-MM-DD) for consistent comparison with API
     const dateString = date.toISOString().split('T')[0]
     
-    console.log(`Checking if event "${event.summary}" on ${dateString} is a nearby job`)
-    console.log('Selected need-to-book event ID:', selectedNeedToBookEvent)
-    console.log('Available nearby jobs data:', needToBookData.nearbyJobsByDay)
-    
-    // Check if this event is a nearby job for the selected need-to-book event
+    // Check if this event is a nearby job for ANY need-to-book event on this date
     const result = Object.entries(needToBookData.nearbyJobsByDay).some(([dateKey, dayData]) => {
-      console.log(`Comparing date key "${dateKey}" with event date ${dateString}`)
-      
       if (dateKey === dateString) {
         const typedDayData = dayData as { needToBookEvent: CalendarEvent; nearbyJobs: Array<{ event: CalendarEvent; distance: number }> }
-        console.log(`Date match found! Need-to-book event: ${typedDayData.needToBookEvent.id}`)
-        console.log(`Selected event: ${selectedNeedToBookEvent}`)
-        console.log(`Nearby jobs for this day:`, typedDayData.nearbyJobs.map(nj => ({ id: nj.event.id, summary: nj.event.summary, distance: nj.distance })))
         
-        // Check if this day's need-to-book event matches the selected one
-        if (typedDayData.needToBookEvent.id === selectedNeedToBookEvent) {
-          const isNearby = typedDayData.nearbyJobs.some(({ event: nearbyEvent }) => nearbyEvent.id === event.id)
-          console.log(`Event ${event.id} (${event.summary}) nearby job match: ${isNearby}`)
-          return isNearby
-        }
+        // Check if this event is a nearby job for this day
+        const isNearby = typedDayData.nearbyJobs.some(({ event: nearbyEvent }) => nearbyEvent.id === event.id)
+        return isNearby
       }
       return false
     })
     
-    console.log(`Final result for "${event.summary}": ${result}`)
     return result
   }
 
   const getNearbyJobDistance = (event: CalendarEvent, date: Date) => {
-    if (!showNearbyJobs || !needToBookData || !selectedNeedToBookEvent) {
+    if (!showNearbyJobs || !needToBookData) {
       return 0
     }
     
@@ -542,11 +516,9 @@ export default function CalendarPage() {
     for (const [dateKey, dayData] of Object.entries(needToBookData.nearbyJobsByDay)) {
       if (dateKey === dateString) {
         const typedDayData = dayData as { needToBookEvent: CalendarEvent; nearbyJobs: Array<{ event: CalendarEvent; distance: number }> }
-        if (typedDayData.needToBookEvent.id === selectedNeedToBookEvent) {
-          const nearbyJob = typedDayData.nearbyJobs.find(({ event: nearbyEvent }) => nearbyEvent.id === event.id)
-          if (nearbyJob) {
-            return nearbyJob.distance
-          }
+        const nearbyJob = typedDayData.nearbyJobs.find(({ event: nearbyEvent }) => nearbyEvent.id === event.id)
+        if (nearbyJob) {
+          return nearbyJob.distance
         }
       }
     }
@@ -659,40 +631,7 @@ export default function CalendarPage() {
               </div>
             </div>
             
-            {/* Debug Panel */}
-            {showNearbyJobs && (
-              <div className="mt-3 p-3 bg-gray-100 dark:bg-gray-600 rounded text-xs">
-                <div className="font-medium text-gray-700 dark:text-gray-300 mb-2">Debug Info:</div>
-                <div className="space-y-1 text-gray-600 dark:text-gray-400">
-                  <div>Need-to-book events: {needToBookData?.needToBookEvents?.length || 0}</div>
-                  <div>Selected event: {selectedNeedToBookEvent || 'None'}</div>
-                  <div>Days with nearby jobs: {needToBookData ? Object.keys(needToBookData.nearbyJobsByDay).length : 0}</div>
-                  {needToBookData && Object.keys(needToBookData.nearbyJobsByDay).length > 0 && (
-                    <div>
-                      Nearby jobs data: {JSON.stringify(needToBookData.nearbyJobsByDay, null, 2)}
-                    </div>
-                  )}
-                  <div className="mt-2">
-                    <button
-                      onClick={async () => {
-                        try {
-                          const response = await fetch('/api/calendar/need-to-book/test')
-                          const data = await response.json()
-                          console.log('Distance Matrix API test result:', data)
-                          alert(`API Test Result:\nStatus: ${data.status}\nDistance: ${data.distance}\nDuration: ${data.duration}`)
-                        } catch (error) {
-                          console.error('API test failed:', error)
-                          alert('API test failed. Check console for details.')
-                        }
-                      }}
-                      className="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600"
-                    >
-                      Test Distance Matrix API
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
+
           </div>
         </div>
         

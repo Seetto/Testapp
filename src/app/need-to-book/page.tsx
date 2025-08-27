@@ -459,40 +459,7 @@ export default function NeedToBookPage() {
               </div>
             </div>
             
-            {/* Debug Panel - Only show when needed for development */}
-            {process.env.NODE_ENV === 'development' && showNearbyJobs && (
-              <div className="mt-3 p-3 bg-gray-100 dark:bg-gray-600 rounded text-xs">
-                <div className="font-medium text-gray-700 dark:text-gray-300 mb-2">Debug Info:</div>
-                <div className="space-y-1 text-gray-600 dark:text-gray-400">
-                  <div>Need-to-book events: {data.needToBookEvents.length}</div>
-                  <div>Selected event: {selectedNeedToBookEvent || 'None'}</div>
-                  <div>Days with nearby jobs: {Object.keys(data.nearbyJobsByDay).length}</div>
-                  {Object.keys(data.nearbyJobsByDay).length > 0 && (
-                    <div>
-                      Nearby jobs data: {JSON.stringify(data.nearbyJobsByDay, null, 2)}
-                    </div>
-                  )}
-                  <div className="mt-2">
-                    <button
-                      onClick={async () => {
-                        try {
-                          const response = await fetch('/api/calendar/need-to-book/test')
-                          const data = await response.json()
-                          console.log('Distance Matrix API test result:', data)
-                          alert(`API Test Result:\nStatus: ${data.status}\nDistance: ${data.distance}\nDuration: ${data.duration}`)
-                        } catch (error) {
-                          console.error('API test failed:', error)
-                          alert('API test failed. Check console for details.')
-                        }
-                      }}
-                      className="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600"
-                    >
-                      Test Distance Matrix API
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
+
           </div>
         </div>
 
