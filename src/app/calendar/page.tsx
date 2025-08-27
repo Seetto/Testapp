@@ -55,6 +55,8 @@ export default function CalendarPage() {
   const [selectedCalendarId, setSelectedCalendarId] = useState<string>('all')
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar')
   const [showNearbyJobs, setShowNearbyJobs] = useState(false)
+  const [selectedNeedToBookEvent, setSelectedNeedToBookEvent] = useState<string>('')
+  const [calendarColors, setCalendarColors] = useState<{ [key: string]: string }>({})
 
   const [startDate, setStartDate] = useState<string>(() => {
     // Default to Monday of current week in YYYY-MM-DD format
@@ -75,11 +77,28 @@ export default function CalendarPage() {
   useEffect(() => {
     if ((session as ExtendedSession)?.accessToken) {
       fetchCalendarEvents()
+      fetchCalendarColors()
       if (viewMode === 'calendar') {
         fetchNeedToBookData()
       }
     }
   }, [session, startDate, selectedCalendarId, viewMode]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const fetchCalendarColors = async () => {
+    try {
+      const calendarsResponse = await fetch('/api/calendar/calendars')
+      if (calendarsResponse.ok) {
+        const calendarsData = await calendarsResponse.json()
+        const colors: { [key: string]: string } = {}
+        calendarsData.calendars?.forEach((calendar: any) => {
+          colors[calendar.id] = calendar.backgroundColor || '#4285f4'
+        })
+        setCalendarColors(colors)
+      }
+    } catch (err) {
+      console.warn('Failed to fetch calendar colors:', err)
+    }
+  }
 
   const fetchNeedToBookData = async () => {
     try {
@@ -112,6 +131,10 @@ export default function CalendarPage() {
         }
         
         setNeedToBookData(allNeedToBookData)
+        // Set first need-to-book event as default selection
+        if (allNeedToBookData.needToBookEvents.length > 0 && !selectedNeedToBookEvent) {
+          setSelectedNeedToBookEvent(allNeedToBookData.needToBookEvents[0].id)
+        }
       } else {
         // Fetch from specific calendar
         const url = `/api/calendar/need-to-book?startDate=${startDate}&calendarId=${encodeURIComponent(selectedCalendarId)}`
@@ -120,6 +143,10 @@ export default function CalendarPage() {
         if (response.ok) {
           const data = await response.json()
           setNeedToBookData(data)
+          // Set first need-to-book event as default selection
+          if (data.needToBookEvents?.length > 0 && !selectedNeedToBookEvent) {
+            setSelectedNeedToBookEvent(data.needToBookEvents[0].id)
+          }
         }
       }
     } catch (err) {
@@ -442,29 +469,63 @@ export default function CalendarPage() {
       }
     })
     
-    // Add nearby jobs from need-to-book data for this date only when checkbox is checked
-    if (showNearbyJobs && needToBookData) {
-      Object.entries(needToBookData.nearbyJobsByDay).forEach(([dateKey, dayData]) => {
-        // Handle both ISO date strings (YYYY-MM-DD) and date strings from the API
-        let keyDate: Date
-        if (dateKey.includes('-')) {
-          // ISO date format (YYYY-MM-DD)
-          keyDate = new Date(dateKey + 'T00:00:00')
-        } else {
-          // Legacy date string format
-          keyDate = new Date(dateKey)
-        }
-        
-        if (keyDate.toDateString() === dateString) {
-          const typedDayData = dayData as { needToBookEvent: CalendarEvent; nearbyJobs: Array<{ event: CalendarEvent; distance: number }> }
-          typedDayData.nearbyJobs.forEach(({ event }) => {
-            eventsForDate.push(event)
-          })
-        }
-      })
+    return eventsForDate
+  }
+
+  const isNearbyJob = (event: CalendarEvent, date: Date) => {
+    if (!showNearbyJobs || !needToBookData || !selectedNeedToBookEvent) {
+      return false
     }
     
-    return eventsForDate
+    const dateString = date.toDateString()
+    
+    // Check if this event is a nearby job for the selected need-to-book event
+    return Object.entries(needToBookData.nearbyJobsByDay).some(([dateKey, dayData]) => {
+      let keyDate: Date
+      if (dateKey.includes('-')) {
+        keyDate = new Date(dateKey + 'T00:00:00')
+      } else {
+        keyDate = new Date(dateKey)
+      }
+      
+      if (keyDate.toDateString() === dateString) {
+        const typedDayData = dayData as { needToBookEvent: CalendarEvent; nearbyJobs: Array<{ event: CalendarEvent; distance: number }> }
+        // Check if this day's need-to-book event matches the selected one
+        if (typedDayData.needToBookEvent.id === selectedNeedToBookEvent) {
+          return typedDayData.nearbyJobs.some(({ event: nearbyEvent }) => nearbyEvent.id === event.id)
+        }
+      }
+      return false
+    })
+  }
+
+  const getNearbyJobDistance = (event: CalendarEvent, date: Date) => {
+    if (!showNearbyJobs || !needToBookData || !selectedNeedToBookEvent) {
+      return 0
+    }
+    
+    const dateString = date.toDateString()
+    
+    // Find the distance for this nearby job
+    for (const [dateKey, dayData] of Object.entries(needToBookData.nearbyJobsByDay)) {
+      let keyDate: Date
+      if (dateKey.includes('-')) {
+        keyDate = new Date(dateKey + 'T00:00:00')
+      } else {
+        keyDate = new Date(dateKey)
+      }
+      
+      if (keyDate.toDateString() === dateString) {
+        const typedDayData = dayData as { needToBookEvent: CalendarEvent; nearbyJobs: Array<{ event: CalendarEvent; distance: number }> }
+        if (typedDayData.needToBookEvent.id === selectedNeedToBookEvent) {
+          const nearbyJob = typedDayData.nearbyJobs.find(({ event: nearbyEvent }) => nearbyEvent.id === event.id)
+          if (nearbyJob) {
+            return nearbyJob.distance
+          }
+        }
+      }
+    }
+    return 0
   }
 
   const formatTime = (dateTime: string) => {
@@ -516,24 +577,61 @@ export default function CalendarPage() {
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
         {/* Legend and Controls */}
         <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-6 text-xs">
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 rounded" style={{ backgroundColor: '#4285f4' }}></div>
-                <span className="text-gray-600 dark:text-gray-400">Calendar Events</span>
-              </div>
+          <div className="flex flex-col space-y-3">
+            {/* Calendar Color Key */}
+            <div className="flex items-center space-x-4 text-xs">
+              <span className="text-gray-600 dark:text-gray-400 font-medium">Calendar Colors:</span>
+              {Object.entries(calendarColors).map(([calendarId, color]) => (
+                <div key={calendarId} className="flex items-center space-x-2">
+                  <div className="w-3 h-3 rounded" style={{ backgroundColor: color }}></div>
+                  <span className="text-gray-600 dark:text-gray-400">
+                    {calendarId === 'primary' ? 'Primary' : calendarId.split('@')[0]}
+                  </span>
+                </div>
+              ))}
             </div>
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="nearby-jobs"
-                checked={showNearbyJobs}
-                onChange={(e) => setShowNearbyJobs(e.target.checked)}
-                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-              />
-              <label htmlFor="nearby-jobs" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Show Nearby Jobs
-              </label>
+            
+            {/* Nearby Jobs Controls */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="nearby-jobs"
+                    checked={showNearbyJobs}
+                    onChange={(e) => setShowNearbyJobs(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                  />
+                  <label htmlFor="nearby-jobs" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Show Nearby Jobs
+                  </label>
+                </div>
+                
+                {showNearbyJobs && needToBookData && needToBookData.needToBookEvents.length > 0 && (
+                  <div className="flex items-center space-x-2">
+                    <label htmlFor="need-to-book-select" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      For:
+                    </label>
+                    <select
+                      id="need-to-book-select"
+                      value={selectedNeedToBookEvent}
+                      onChange={(e) => setSelectedNeedToBookEvent(e.target.value)}
+                      className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      {needToBookData.needToBookEvents.map((event) => (
+                        <option key={event.id} value={event.id}>
+                          {event.summary} - {new Date(event.start.dateTime || event.start.date || '').toLocaleDateString()}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 rounded border-2 border-yellow-400" style={{ backgroundColor: 'rgba(255, 255, 0, 0.3)' }}></div>
+                <span className="text-xs text-gray-600 dark:text-gray-400">Nearby Jobs (highlighted)</span>
+              </div>
             </div>
           </div>
         </div>
@@ -594,22 +692,12 @@ export default function CalendarPage() {
                       const height = Math.max(duration * 64, 20) // minimum height of 20px
 
                                              // Determine if this is a nearby job from need-to-book data
-                       let isNearbyJob = false
-                       let distance = 0
-                       if (showNearbyJobs && needToBookData) {
-                         Object.entries(needToBookData.nearbyJobsByDay).forEach(([, dayData]) => {
-                           const typedDayData = dayData as { needToBookEvent: CalendarEvent; nearbyJobs: Array<{ event: CalendarEvent; distance: number }> }
-                           const nearbyJob = typedDayData.nearbyJobs.find(({ event: nearbyEvent }) => nearbyEvent.id === event.id)
-                           if (nearbyJob) {
-                             isNearbyJob = true
-                             distance = nearbyJob.distance
-                           }
-                         })
-                       }
+                       const isNearbyJobEvent = isNearbyJob(event, date)
+                       const distance = getNearbyJobDistance(event, date)
 
                       // Use original Google Calendar colors for all events
                       const backgroundColor = event.backgroundColor || '#4285f4'
-                      const borderStyle = 'none'
+                      const borderStyle = isNearbyJobEvent ? '2px solid #f59e0b' : 'none' // Yellow border for nearby jobs
 
                       return (
                         <div
@@ -623,13 +711,13 @@ export default function CalendarPage() {
                             zIndex: eventIndex + 1
                           }}
                           onClick={() => openInGoogleCalendar(event)}
-                          title={`${event.summary} - ${formatTime(event.start.dateTime!)}${isNearbyJob ? ` (${distance.toFixed(1)}km away)` : ''}`}
+                          title={`${event.summary} - ${formatTime(event.start.dateTime!)}${isNearbyJobEvent ? ` (${distance.toFixed(1)}km away)` : ''}`}
                         >
                           <div className="font-medium truncate">{event.summary}</div>
                           {height > 30 && (
                             <div className="text-xs opacity-90 truncate">
                               {formatTime(event.start.dateTime!)} - {formatTime(event.end.dateTime || event.start.dateTime!)}
-                              {isNearbyJob && <span className="ml-1">({distance.toFixed(1)}km)</span>}
+                              {isNearbyJobEvent && <span className="ml-1">({distance.toFixed(1)}km)</span>}
                             </div>
                           )}
                         </div>
