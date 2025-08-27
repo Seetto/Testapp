@@ -93,10 +93,15 @@ export default function CalendarPage() {
 
   // Fetch need-to-book data when nearby jobs checkbox is checked
   useEffect(() => {
-    if (showNearbyJobs && (session as ExtendedSession)?.accessToken && !needToBookData) {
+    if (showNearbyJobs && (session as ExtendedSession)?.accessToken) {
       fetchNeedToBookData()
     }
-  }, [showNearbyJobs, session, needToBookData]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [showNearbyJobs, session]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Force re-render when selected need-to-book event changes to update nearby job highlighting
+  useEffect(() => {
+    // This will trigger a re-render of the calendar view
+  }, [selectedNeedToBookEvent])
 
   const fetchCalendarColors = async () => {
     try {
@@ -490,48 +495,60 @@ export default function CalendarPage() {
   }
 
   const isNearbyJob = (event: CalendarEvent, date: Date) => {
-    if (!showNearbyJobs || !needToBookData) {
+    if (!showNearbyJobs || !needToBookData || !selectedNeedToBookEvent) {
       return false
     }
     
-    // Get the event's actual date (not the date we're currently rendering)
-    const eventDate = new Date(event.start.dateTime || event.start.date || '')
-    const eventDateString = eventDate.toISOString().split('T')[0]
-    
-    // Check if this event is a nearby job for ANY need-to-book event on the event's actual date
-    const result = Object.entries(needToBookData.nearbyJobsByDay).some(([dateKey, dayData]) => {
-      if (dateKey === eventDateString) {
-        const typedDayData = dayData as { needToBookEvent: CalendarEvent; nearbyJobs: Array<{ event: CalendarEvent; distance: number }> }
-        
-        // Check if this event is a nearby job for this day
-        const isNearby = typedDayData.nearbyJobs.some(({ event: nearbyEvent }) => nearbyEvent.id === event.id)
-        return isNearby
-      }
+    // Find the selected need-to-book event
+    const selectedEvent = needToBookData.needToBookEvents.find((e: CalendarEvent) => e.id === selectedNeedToBookEvent)
+    if (!selectedEvent) {
       return false
-    })
+    }
     
-    return result
+    // Get the selected need-to-book event's date
+    const needToBookDate = new Date(selectedEvent.start.dateTime || selectedEvent.start.date || '')
+    const needToBookDateString = needToBookDate.toISOString().split('T')[0]
+    
+    // Check if this event is a nearby job for the selected need-to-book event
+    const dayData = needToBookData.nearbyJobsByDay[needToBookDateString]
+    if (!dayData) {
+      return false
+    }
+    
+    const typedDayData = dayData as { needToBookEvent: CalendarEvent; nearbyJobs: Array<{ event: CalendarEvent; distance: number }> }
+    
+    // Check if this event is a nearby job for the selected need-to-book event
+    const isNearby = typedDayData.nearbyJobs.some(({ event: nearbyEvent }) => nearbyEvent.id === event.id)
+    return isNearby
   }
 
   const getNearbyJobDistance = (event: CalendarEvent, date: Date) => {
-    if (!showNearbyJobs || !needToBookData) {
+    if (!showNearbyJobs || !needToBookData || !selectedNeedToBookEvent) {
       return 0
     }
     
-    // Get the event's actual date (not the date we're currently rendering)
-    const eventDate = new Date(event.start.dateTime || event.start.date || '')
-    const eventDateString = eventDate.toISOString().split('T')[0]
+    // Find the selected need-to-book event
+    const selectedEvent = needToBookData.needToBookEvents.find((e: CalendarEvent) => e.id === selectedNeedToBookEvent)
+    if (!selectedEvent) {
+      return 0
+    }
+    
+    // Get the selected need-to-book event's date
+    const needToBookDate = new Date(selectedEvent.start.dateTime || selectedEvent.start.date || '')
+    const needToBookDateString = needToBookDate.toISOString().split('T')[0]
     
     // Find the distance for this nearby job
-    for (const [dateKey, dayData] of Object.entries(needToBookData.nearbyJobsByDay)) {
-      if (dateKey === eventDateString) {
-        const typedDayData = dayData as { needToBookEvent: CalendarEvent; nearbyJobs: Array<{ event: CalendarEvent; distance: number }> }
-        const nearbyJob = typedDayData.nearbyJobs.find(({ event: nearbyEvent }) => nearbyEvent.id === event.id)
-        if (nearbyJob) {
-          return nearbyJob.distance
-        }
-      }
+    const dayData = needToBookData.nearbyJobsByDay[needToBookDateString]
+    if (!dayData) {
+      return 0
     }
+    
+    const typedDayData = dayData as { needToBookEvent: CalendarEvent; nearbyJobs: Array<{ event: CalendarEvent; distance: number }> }
+    const nearbyJob = typedDayData.nearbyJobs.find(({ event: nearbyEvent }) => nearbyEvent.id === event.id)
+    if (nearbyJob) {
+      return nearbyJob.distance
+    }
+    
     return 0
   }
 
@@ -606,7 +623,13 @@ export default function CalendarPage() {
                     type="checkbox"
                     id="nearby-jobs"
                     checked={showNearbyJobs}
-                    onChange={(e) => setShowNearbyJobs(e.target.checked)}
+                    onChange={(e) => {
+                      setShowNearbyJobs(e.target.checked)
+                      if (!e.target.checked) {
+                        setNeedToBookData(null)
+                        setSelectedNeedToBookEvent('')
+                      }
+                    }}
                     className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
                   />
                   <label htmlFor="nearby-jobs" className="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -636,7 +659,7 @@ export default function CalendarPage() {
               </div>
               
               <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 rounded border-2 border-yellow-400" style={{ backgroundColor: 'rgba(255, 255, 0, 0.3)' }}></div>
+                <div className="w-3 h-3 rounded" style={{ backgroundColor: 'rgba(255, 255, 0, 0.3)' }}></div>
                 <span className="text-xs text-gray-600 dark:text-gray-400">Nearby Jobs (highlighted)</span>
               </div>
             </div>
@@ -704,9 +727,13 @@ export default function CalendarPage() {
                        const isNearbyJobEvent = isNearbyJob(event, date)
                        const distance = getNearbyJobDistance(event, date)
 
-                      // Use original Google Calendar colors for all events
-                      const backgroundColor = event.backgroundColor || '#4285f4'
-                      const borderStyle = isNearbyJobEvent ? '2px solid #f59e0b' : 'none' // Yellow border for nearby jobs
+                      // Use original Google Calendar colors for all events, but highlight nearby jobs with yellow background
+                      let backgroundColor = event.backgroundColor || '#4285f4'
+                      if (isNearbyJobEvent) {
+                        // Overlay yellow background for nearby jobs
+                        backgroundColor = 'rgba(255, 255, 0, 0.3)'
+                      }
+                      const borderStyle = 'none'
 
                       return (
                         <div
@@ -832,7 +859,7 @@ export default function CalendarPage() {
               year: 'numeric',
               month: 'long',
               day: 'numeric'
-            })} onwards. Calendar view shows Monday-Friday work week. Use the checkbox to show nearby jobs within 20km of your &quot;Need to book&quot; events.
+            })} onwards. Calendar view shows Monday-Friday work week. Use the checkbox to show nearby jobs within 20km of your &quot;Need to book&quot; events. Nearby jobs will be highlighted in yellow.
           </p>
         </div>
 
@@ -916,8 +943,20 @@ export default function CalendarPage() {
                       </div>
                     </div>
                     <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                      {dateEvents.map(event => (
-                        <div key={event.id} className="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                      {dateEvents.map(event => {
+                        const isNearbyJobEvent = isNearbyJob(event, date)
+                        const distance = getNearbyJobDistance(event, date)
+                        
+                        return (
+                          <div 
+                            key={event.id} 
+                            className={`px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${
+                              isNearbyJobEvent ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''
+                            }`}
+                            style={{
+                              backgroundColor: isNearbyJobEvent ? 'rgba(255, 255, 0, 0.1)' : undefined
+                            }}
+                          >
                           <div className="flex items-start space-x-3">
                             <div 
                               className="flex-shrink-0 w-2 h-2 rounded-full mt-2"
@@ -929,9 +968,16 @@ export default function CalendarPage() {
                             <div className="flex-1 min-w-0">
                               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between">
                                 <div className="flex-1">
-                                  <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                                    {event.summary || 'Untitled Event'}
-                                  </h3>
+                                  <div className="flex items-center space-x-2">
+                                    <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                      {event.summary || 'Untitled Event'}
+                                    </h3>
+                                    {isNearbyJobEvent && (
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                                        Nearby Job ({distance.toFixed(1)}km)
+                                      </span>
+                                    )}
+                                  </div>
                                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                     {formatEventDate(event)}
                                   </p>
@@ -992,7 +1038,8 @@ export default function CalendarPage() {
                             </div>
                           </div>
                         </div>
-                      ))}
+                      )
+                    })}
                     </div>
                   </div>
                 )
