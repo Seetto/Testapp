@@ -138,12 +138,7 @@ export default function NeedToBookPage() {
     }
   }, [session, startDate, selectedCalendarId, fetchNeedToBookEvents])
 
-  // Auto-select the first need-to-book event when data is loaded
-  useEffect(() => {
-    if (data && data.needToBookEvents.length > 0 && !selectedNeedToBookEvent) {
-      setSelectedNeedToBookEvent(data.needToBookEvents[0].id)
-    }
-  }, [data, selectedNeedToBookEvent])
+
 
   // Clear selection when nearby jobs checkbox is unchecked
   useEffect(() => {
@@ -151,6 +146,13 @@ export default function NeedToBookPage() {
       setSelectedNeedToBookEvent('')
     }
   }, [showNearbyJobs])
+
+  // Auto-select the first need-to-book event when data is loaded and nearby jobs are shown
+  useEffect(() => {
+    if (data && data.needToBookEvents.length > 0 && !selectedNeedToBookEvent && showNearbyJobs) {
+      setSelectedNeedToBookEvent(data.needToBookEvents[0].id)
+    }
+  }, [data, selectedNeedToBookEvent, showNearbyJobs])
 
   const formatEventDate = (event: CalendarEvent) => {
     const startDate = event.start.dateTime || event.start.date
@@ -359,23 +361,21 @@ export default function NeedToBookPage() {
   }
 
   const isNearbyJob = (event: CalendarEvent, date: Date) => {
-    if (!showNearbyJobs || !data || !selectedNeedToBookEvent) {
+    if (!showNearbyJobs || !data) {
       return false
     }
     
     // Use ISO date string (YYYY-MM-DD) for consistent comparison with API
     const dateString = date.toISOString().split('T')[0]
     
-    // Check if this event is a nearby job for the selected need-to-book event
+    // Check if this event is a nearby job for ANY need-to-book event on this date
     const result = Object.entries(data.nearbyJobsByDay).some(([dateKey, dayData]) => {
       if (dateKey === dateString) {
         const typedDayData = dayData as { needToBookEvent: CalendarEvent; nearbyJobs: Array<{ event: CalendarEvent; distance: number }> }
         
-        // Check if this day's need-to-book event matches the selected one
-        if (typedDayData.needToBookEvent.id === selectedNeedToBookEvent) {
-          const isNearby = typedDayData.nearbyJobs.some(({ event: nearbyEvent }) => nearbyEvent.id === event.id)
-          return isNearby
-        }
+        // Check if this event is a nearby job for this day
+        const isNearby = typedDayData.nearbyJobs.some(({ event: nearbyEvent }) => nearbyEvent.id === event.id)
+        return isNearby
       }
       return false
     })
@@ -384,7 +384,7 @@ export default function NeedToBookPage() {
   }
 
   const getNearbyJobDistance = (event: CalendarEvent, date: Date) => {
-    if (!showNearbyJobs || !data || !selectedNeedToBookEvent) {
+    if (!showNearbyJobs || !data) {
       return 0
     }
     
@@ -395,11 +395,9 @@ export default function NeedToBookPage() {
     for (const [dateKey, dayData] of Object.entries(data.nearbyJobsByDay)) {
       if (dateKey === dateString) {
         const typedDayData = dayData as { needToBookEvent: CalendarEvent; nearbyJobs: Array<{ event: CalendarEvent; distance: number }> }
-        if (typedDayData.needToBookEvent.id === selectedNeedToBookEvent) {
-          const nearbyJob = typedDayData.nearbyJobs.find(({ event: nearbyEvent }) => nearbyEvent.id === event.id)
-          if (nearbyJob) {
-            return nearbyJob.distance
-          }
+        const nearbyJob = typedDayData.nearbyJobs.find(({ event: nearbyEvent }) => nearbyEvent.id === event.id)
+        if (nearbyJob) {
+          return nearbyJob.distance
         }
       }
     }
@@ -444,7 +442,7 @@ export default function NeedToBookPage() {
                       onChange={(e) => setSelectedNeedToBookEvent(e.target.value)}
                       className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
-                      <option value="">Select a &quot;Need to book&quot; event</option>
+                      <option value="">All &quot;Need to book&quot; events</option>
                       {data.needToBookEvents.map((event) => (
                         <option key={event.id} value={event.id}>
                           {event.summary} - {new Date(event.start.dateTime || event.start.date || '').toLocaleDateString()}
@@ -461,8 +459,8 @@ export default function NeedToBookPage() {
               </div>
             </div>
             
-            {/* Debug Panel */}
-            {showNearbyJobs && (
+            {/* Debug Panel - Only show when needed for development */}
+            {process.env.NODE_ENV === 'development' && showNearbyJobs && (
               <div className="mt-3 p-3 bg-gray-100 dark:bg-gray-600 rounded text-xs">
                 <div className="font-medium text-gray-700 dark:text-gray-300 mb-2">Debug Info:</div>
                 <div className="space-y-1 text-gray-600 dark:text-gray-400">
