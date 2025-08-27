@@ -52,6 +52,8 @@ export default function NeedToBookPage() {
   const [error, setError] = useState<string | null>(null)
   const [selectedCalendarId, setSelectedCalendarId] = useState<string>('all')
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar')
+  const [showNearbyJobs, setShowNearbyJobs] = useState(true)
+  const [selectedNeedToBookEvent, setSelectedNeedToBookEvent] = useState<string>('')
 
   const [startDate, setStartDate] = useState<string>(() => {
     const today = new Date()
@@ -135,6 +137,20 @@ export default function NeedToBookPage() {
       fetchNeedToBookEvents()
     }
   }, [session, startDate, selectedCalendarId, fetchNeedToBookEvents])
+
+  // Auto-select the first need-to-book event when data is loaded
+  useEffect(() => {
+    if (data && data.needToBookEvents.length > 0 && !selectedNeedToBookEvent) {
+      setSelectedNeedToBookEvent(data.needToBookEvents[0].id)
+    }
+  }, [data, selectedNeedToBookEvent])
+
+  // Clear selection when nearby jobs checkbox is unchecked
+  useEffect(() => {
+    if (!showNearbyJobs) {
+      setSelectedNeedToBookEvent('')
+    }
+  }, [showNearbyJobs])
 
   const formatEventDate = (event: CalendarEvent) => {
     const startDate = event.start.dateTime || event.start.date
@@ -342,6 +358,54 @@ export default function NeedToBookPage() {
     return { startHour, endHour, totalHours: endHour - startHour + 1 }
   }
 
+  const isNearbyJob = (event: CalendarEvent, date: Date) => {
+    if (!showNearbyJobs || !data || !selectedNeedToBookEvent) {
+      return false
+    }
+    
+    // Use ISO date string (YYYY-MM-DD) for consistent comparison with API
+    const dateString = date.toISOString().split('T')[0]
+    
+    // Check if this event is a nearby job for the selected need-to-book event
+    const result = Object.entries(data.nearbyJobsByDay).some(([dateKey, dayData]) => {
+      if (dateKey === dateString) {
+        const typedDayData = dayData as { needToBookEvent: CalendarEvent; nearbyJobs: Array<{ event: CalendarEvent; distance: number }> }
+        
+        // Check if this day's need-to-book event matches the selected one
+        if (typedDayData.needToBookEvent.id === selectedNeedToBookEvent) {
+          const isNearby = typedDayData.nearbyJobs.some(({ event: nearbyEvent }) => nearbyEvent.id === event.id)
+          return isNearby
+        }
+      }
+      return false
+    })
+    
+    return result
+  }
+
+  const getNearbyJobDistance = (event: CalendarEvent, date: Date) => {
+    if (!showNearbyJobs || !data || !selectedNeedToBookEvent) {
+      return 0
+    }
+    
+    // Use ISO date string (YYYY-MM-DD) for consistent comparison with API
+    const dateString = date.toISOString().split('T')[0]
+    
+    // Find the distance for this nearby job
+    for (const [dateKey, dayData] of Object.entries(data.nearbyJobsByDay)) {
+      if (dateKey === dateString) {
+        const typedDayData = dayData as { needToBookEvent: CalendarEvent; nearbyJobs: Array<{ event: CalendarEvent; distance: number }> }
+        if (typedDayData.needToBookEvent.id === selectedNeedToBookEvent) {
+          const nearbyJob = typedDayData.nearbyJobs.find(({ event: nearbyEvent }) => nearbyEvent.id === event.id)
+          if (nearbyJob) {
+            return nearbyJob.distance
+          }
+        }
+      }
+    }
+    return 0
+  }
+
   const renderCalendarView = () => {
     if (!data) return null
     
@@ -350,6 +414,90 @@ export default function NeedToBookPage() {
     
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+        {/* Legend and Controls */}
+        <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700">
+          <div className="flex flex-col space-y-3">
+            {/* Nearby Jobs Controls */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="nearby-jobs"
+                    checked={showNearbyJobs}
+                    onChange={(e) => setShowNearbyJobs(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                  />
+                  <label htmlFor="nearby-jobs" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Show Nearby Jobs
+                  </label>
+                </div>
+                
+                {showNearbyJobs && data.needToBookEvents.length > 0 && (
+                  <div className="flex items-center space-x-2">
+                    <label htmlFor="need-to-book-select" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      For:
+                    </label>
+                    <select
+                      id="need-to-book-select"
+                      value={selectedNeedToBookEvent}
+                      onChange={(e) => setSelectedNeedToBookEvent(e.target.value)}
+                      className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="">Select a "Need to book" event</option>
+                      {data.needToBookEvents.map((event) => (
+                        <option key={event.id} value={event.id}>
+                          {event.summary} - {new Date(event.start.dateTime || event.start.date || '').toLocaleDateString()}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 rounded border-2 border-yellow-400" style={{ backgroundColor: 'rgba(255, 255, 0, 0.3)' }}></div>
+                <span className="text-xs text-gray-600 dark:text-gray-400">Nearby Jobs (highlighted)</span>
+              </div>
+            </div>
+            
+            {/* Debug Panel */}
+            {showNearbyJobs && (
+              <div className="mt-3 p-3 bg-gray-100 dark:bg-gray-600 rounded text-xs">
+                <div className="font-medium text-gray-700 dark:text-gray-300 mb-2">Debug Info:</div>
+                <div className="space-y-1 text-gray-600 dark:text-gray-400">
+                  <div>Need-to-book events: {data.needToBookEvents.length}</div>
+                  <div>Selected event: {selectedNeedToBookEvent || 'None'}</div>
+                  <div>Days with nearby jobs: {Object.keys(data.nearbyJobsByDay).length}</div>
+                  {Object.keys(data.nearbyJobsByDay).length > 0 && (
+                    <div>
+                      Nearby jobs data: {JSON.stringify(data.nearbyJobsByDay, null, 2)}
+                    </div>
+                  )}
+                  <div className="mt-2">
+                    <button
+                      onClick={async () => {
+                        try {
+                          const response = await fetch('/api/calendar/need-to-book/test')
+                          const data = await response.json()
+                          console.log('Distance Matrix API test result:', data)
+                          alert(`API Test Result:\nStatus: ${data.status}\nDistance: ${data.distance}\nDuration: ${data.duration}`)
+                        } catch (error) {
+                          console.error('API test failed:', error)
+                          alert('API test failed. Check console for details.')
+                        }
+                      }}
+                      className="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600"
+                    >
+                      Test Distance Matrix API
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Week header */}
         <div className="grid grid-cols-8 border-b border-gray-200 dark:border-gray-700">
           <div className="p-3 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700">
@@ -411,6 +559,13 @@ export default function NeedToBookPage() {
                       // Determine if this is a "need to book" event
                       const isNeedToBook = data.needToBookEvents.some(ntbEvent => ntbEvent.id === event.id)
                       const backgroundColor = isNeedToBook ? '#f97316' : (event.backgroundColor || '#4285f4')
+                      
+                      // Determine if this is a nearby job from need-to-book data
+                      const isNearbyJobEvent = isNearbyJob(event, date)
+                      const distance = getNearbyJobDistance(event, date)
+                      
+                      // Add yellow border for nearby jobs
+                      const borderStyle = isNearbyJobEvent ? '2px solid #f59e0b' : 'none'
 
                       return (
                         <div
@@ -420,15 +575,17 @@ export default function NeedToBookPage() {
                             top: `${topOffset}px`,
                             height: `${height}px`,
                             backgroundColor,
+                            border: borderStyle,
                             zIndex: eventIndex + 1
                           }}
                           onClick={() => openInGoogleCalendar(event)}
-                          title={`${event.summary} - ${formatTime(event.start.dateTime!)}`}
+                          title={`${event.summary} - ${formatTime(event.start.dateTime!)}${isNearbyJobEvent ? ` (${distance.toFixed(1)}km away)` : ''}`}
                         >
                           <div className="font-medium truncate">{event.summary}</div>
                           {height > 30 && (
                             <div className="text-xs opacity-90 truncate">
                               {formatTime(event.start.dateTime!)} - {formatTime(event.end.dateTime || event.start.dateTime!)}
+                              {isNearbyJobEvent && <span className="ml-1">({distance.toFixed(1)}km)</span>}
                             </div>
                           )}
                         </div>
