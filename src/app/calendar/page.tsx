@@ -91,6 +91,13 @@ export default function CalendarPage() {
     }
   }, [session, startDate, selectedCalendarId, viewMode]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Fetch need-to-book data when nearby jobs checkbox is checked
+  useEffect(() => {
+    if (showNearbyJobs && (session as ExtendedSession)?.accessToken && !needToBookData) {
+      fetchNeedToBookData()
+    }
+  }, [showNearbyJobs, session, needToBookData]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const fetchCalendarColors = async () => {
     try {
       const calendarsResponse = await fetch('/api/calendar/calendars')
@@ -478,6 +485,23 @@ export default function CalendarPage() {
         eventsForDate.push(event)
       }
     })
+    
+    // Add nearby jobs for this date when nearby jobs are enabled
+    if (showNearbyJobs && needToBookData) {
+      Object.entries(needToBookData.nearbyJobsByDay).forEach(([dateKey, dayData]) => {
+        if (dateKey === dateString) {
+          const typedDayData = dayData as { needToBookEvent: CalendarEvent; nearbyJobs: Array<{ event: CalendarEvent; distance: number }> }
+          typedDayData.nearbyJobs.forEach(({ event }: { event: CalendarEvent; distance: number }) => {
+            // Only add if not already in the list (avoid duplicates)
+            if (!eventsForDate.some(existingEvent => existingEvent.id === event.id)) {
+              console.log(`Adding nearby job to calendar: ${event.summary} on ${dateString}`)
+              eventsForDate.push(event)
+            }
+          })
+        }
+      })
+    }
+    
     return eventsForDate
   }
 
@@ -496,6 +520,9 @@ export default function CalendarPage() {
         
         // Check if this event is a nearby job for this day
         const isNearby = typedDayData.nearbyJobs.some(({ event: nearbyEvent }) => nearbyEvent.id === event.id)
+        if (isNearby) {
+          console.log(`Found nearby job: ${event.summary} on ${dateString}`)
+        }
         return isNearby
       }
       return false
