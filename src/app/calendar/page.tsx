@@ -26,6 +26,9 @@ interface CalendarEvent {
   }
   location?: string
   htmlLink: string
+  calendarId?: string
+  backgroundColor?: string
+  foregroundColor?: string
 }
 
 export default function CalendarPage() {
@@ -480,7 +483,13 @@ export default function CalendarPage() {
                     {dateEvents.map(event => (
                       <div key={event.id} className="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                         <div className="flex items-start space-x-3">
-                          <div className="flex-shrink-0 w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
+                          <div 
+                            className="flex-shrink-0 w-2 h-2 rounded-full mt-2"
+                            style={{ 
+                              backgroundColor: event.backgroundColor || '#4285f4' // Default Google Calendar blue
+                            }}
+                            title={`Calendar: ${event.calendarId || 'Primary'}`}
+                          ></div>
                           <div className="flex-1 min-w-0">
                             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between">
                               <div className="flex-1">

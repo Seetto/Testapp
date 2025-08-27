@@ -24,6 +24,9 @@ interface CalendarEvent {
   }
   location?: string
   htmlLink: string
+  calendarId?: string
+  backgroundColor?: string
+  foregroundColor?: string
 }
 
 export async function GET(request: Request) {
@@ -78,7 +81,29 @@ export async function GET(request: Request) {
     const events = (response.data.items as CalendarEvent[]) || []
     console.log(`Successfully fetched ${events.length} events`)
 
-    return NextResponse.json({ events })
+    // Get calendar information to add colors
+    let calendarInfo: { backgroundColor?: string; foregroundColor?: string } = {}
+    if (calendarIdParam !== 'primary') {
+      try {
+        const calendarResponse = await calendar.calendarList.get({ calendarId: calendarIdParam })
+        calendarInfo = {
+          backgroundColor: calendarResponse.data.backgroundColor || undefined,
+          foregroundColor: calendarResponse.data.foregroundColor || undefined
+        }
+      } catch (err) {
+        console.warn('Could not fetch calendar info for colors:', err)
+      }
+    }
+
+    // Add calendar information to events
+    const eventsWithCalendarInfo = events.map(event => ({
+      ...event,
+      calendarId: calendarIdParam,
+      backgroundColor: calendarInfo.backgroundColor,
+      foregroundColor: calendarInfo.foregroundColor
+    }))
+
+    return NextResponse.json({ events: eventsWithCalendarInfo })
   } catch (error: unknown) {
     console.error('Calendar API error:', error)
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'

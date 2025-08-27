@@ -26,6 +26,9 @@ interface CalendarEvent {
   }
   location?: string
   htmlLink: string
+  calendarId?: string
+  backgroundColor?: string
+  foregroundColor?: string
 }
 
 interface NearbyJobsResponse {
@@ -857,8 +860,16 @@ export default function NeedToBookPage() {
                             {dayJobs.map((job, index) => (
                               <div key={index} className="bg-white dark:bg-gray-800 rounded-md p-3 border border-gray-200 dark:border-gray-600">
                                 <div className="flex items-start justify-between">
-                                  <div className="flex-1">
-                                    <h6 className="font-medium text-gray-900 dark:text-white text-sm">
+                                  <div className="flex items-start space-x-3">
+                                    <div 
+                                      className="flex-shrink-0 w-2 h-2 rounded-full mt-2"
+                                      style={{ 
+                                        backgroundColor: job.event.backgroundColor || '#4285f4' // Default Google Calendar blue
+                                      }}
+                                      title={`Calendar: ${job.event.calendarId || 'Primary'}`}
+                                    ></div>
+                                    <div className="flex-1">
+                                      <h6 className="font-medium text-gray-900 dark:text-white text-sm">
                                       {job.event.summary || 'Untitled Event'}
                                     </h6>
                                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">

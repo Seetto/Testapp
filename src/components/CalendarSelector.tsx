@@ -80,6 +80,18 @@ export default function CalendarSelector({
     }
   }
 
+  const getCalendarIcon = (calendar: Calendar) => {
+    // Use a colored dot instead of access role icons
+    const backgroundColor = calendar.backgroundColor || '#4285f4' // Default Google Calendar blue
+    return (
+      <div 
+        className="w-3 h-3 rounded-full flex-shrink-0"
+        style={{ backgroundColor }}
+        title={`${calendar.summary} (${calendar.accessRole})`}
+      />
+    )
+  }
+
   if (loading) {
     return (
       <div className={`flex items-center space-x-2 ${className}`}>

@@ -56,10 +56,28 @@ export async function GET() {
       cal.accessRole === 'owner'
     )
 
-    console.log(`${readableCalendars.length} calendars are readable`)
+    // Filter out holiday calendars and similar system calendars
+    const filteredCalendars = readableCalendars.filter(cal => {
+      const summary = cal.summary.toLowerCase()
+      const description = (cal.description || '').toLowerCase()
+      
+      // Exclude calendars that are likely holiday or system calendars
+      const holidayKeywords = [
+        'holiday', 'holidays', 'australia', 'australian', 'public holiday',
+        'national holiday', 'federal holiday', 'state holiday', 'bank holiday',
+        'observance', 'observances', 'en.usa', 'en.australia', 'en.gb',
+        'calendar', 'calendars', 'system', 'default'
+      ]
+      
+      return !holidayKeywords.some(keyword => 
+        summary.includes(keyword) || description.includes(keyword)
+      )
+    })
+
+    console.log(`${filteredCalendars.length} calendars after filtering out holiday/system calendars`)
 
     return NextResponse.json({ 
-      calendars: readableCalendars.map(cal => ({
+      calendars: filteredCalendars.map(cal => ({
         id: cal.id,
         summary: cal.summary,
         description: cal.description,
