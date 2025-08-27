@@ -148,7 +148,8 @@ export async function GET(request: Request) {
 
       // Get all events on the same day or nearby days
       const eventDate = new Date(needToBookEvent.start.dateTime || needToBookEvent.start.date || '')
-      const dayKey = eventDate.toDateString()
+      // Use ISO date string (YYYY-MM-DD) for consistent date handling across timezones
+      const dayKey = eventDate.toISOString().split('T')[0]
 
       // Check events within 7 days before and after
       const nearbyEvents: Array<{event: CalendarEvent, distance: number}> = []

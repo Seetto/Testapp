@@ -51,7 +51,7 @@ export default function NeedToBookPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedCalendarId, setSelectedCalendarId] = useState<string>('all')
-  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar')
 
   const [startDate, setStartDate] = useState<string>(() => {
     const today = new Date()
@@ -246,21 +246,54 @@ export default function NeedToBookPage() {
   }
 
   const getEventsForDate = (date: Date) => {
-    const dateString = date.toDateString()
     const events: CalendarEvent[] = []
+    
+    // Helper function to compare dates by their actual date components (ignoring time)
+    const isSameDate = (date1: Date, date2: Date) => {
+      return date1.getFullYear() === date2.getFullYear() &&
+             date1.getMonth() === date2.getMonth() &&
+             date1.getDate() === date2.getDate()
+    }
+    
+    // Helper function to get date in local timezone without timezone conversion issues
+    const getLocalDate = (dateTimeString: string) => {
+      // Parse the ISO string and create a date in local timezone
+      const date = new Date(dateTimeString)
+      // Adjust for timezone offset to get the actual local date
+      const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000))
+      return localDate
+    }
     
     // Add need-to-book events for this date
     if (data) {
       data.needToBookEvents.forEach((event: CalendarEvent) => {
-        const eventDate = new Date(event.start.dateTime || event.start.date || '')
-        if (eventDate.toDateString() === dateString) {
-          events.push(event)
+        if (event.start.dateTime) {
+          const eventDate = getLocalDate(event.start.dateTime)
+          if (isSameDate(eventDate, date)) {
+            events.push(event)
+          }
+        } else if (event.start.date) {
+          // For all-day events, compare the date string directly
+          const eventDate = new Date(event.start.date)
+          if (isSameDate(eventDate, date)) {
+            events.push(event)
+          }
         }
       })
       
       // Add nearby jobs for this date
       Object.entries(data.nearbyJobsByDay).forEach(([dateKey, dayData]) => {
-        if (new Date(dateKey).toDateString() === dateString) {
+        // Handle both ISO date strings (YYYY-MM-DD) and date strings from the API
+        let keyDate: Date
+        if (dateKey.includes('-')) {
+          // ISO date format (YYYY-MM-DD)
+          keyDate = new Date(dateKey + 'T00:00:00')
+        } else {
+          // Legacy date string format
+          keyDate = new Date(dateKey)
+        }
+        
+        if (isSameDate(keyDate, date)) {
           const typedDayData = dayData as { needToBookEvent: CalendarEvent; nearbyJobs: Array<{ event: CalendarEvent; distance: number }> }
           typedDayData.nearbyJobs.forEach(({ event }: { event: CalendarEvent; distance: number }) => {
             events.push(event)
@@ -282,7 +315,9 @@ export default function NeedToBookPage() {
 
   const isToday = (date: Date) => {
     const today = new Date()
-    return date.toDateString() === today.toDateString()
+    return date.getFullYear() === today.getFullYear() &&
+           date.getMonth() === today.getMonth() &&
+           date.getDate() === today.getDate()
   }
 
   const getTimeRangeForWeek = (weekDates: Date[]) => {
@@ -293,7 +328,10 @@ export default function NeedToBookPage() {
       const dateEvents = getEventsForDate(date)
       dateEvents.forEach((event: CalendarEvent) => {
         if (event.start.dateTime) {
-          const eventHour = new Date(event.start.dateTime).getHours()
+          // Use the same local date logic to avoid timezone issues
+          const eventDate = new Date(event.start.dateTime)
+          const localEventDate = new Date(eventDate.getTime() - (eventDate.getTimezoneOffset() * 60000))
+          const eventHour = localEventDate.getHours()
           earliestHour = Math.min(earliestHour, eventHour)
           latestHour = Math.max(latestHour, eventHour)
         }
@@ -363,17 +401,23 @@ export default function NeedToBookPage() {
                 const hour = startHour + index
                 const hourEvents = getEventsForDate(date).filter(event => {
                   if (!event.start.dateTime) return false
-                  const eventHour = new Date(event.start.dateTime).getHours()
+                  // Use the same local date logic to avoid timezone issues
+                  const eventDate = new Date(event.start.dateTime)
+                  const localEventDate = new Date(eventDate.getTime() - (eventDate.getTimezoneOffset() * 60000))
+                  const eventHour = localEventDate.getHours()
                   return eventHour === hour
                 })
 
                 return (
                   <div key={hour} className="h-16 border-b border-gray-100 dark:border-gray-600 relative">
                     {hourEvents.map((event: CalendarEvent, eventIndex) => {
+                      // Use local time for positioning to avoid timezone issues
                       const startTime = new Date(event.start.dateTime!)
+                      const localStartTime = new Date(startTime.getTime() - (startTime.getTimezoneOffset() * 60000))
                       const endTime = new Date(event.end.dateTime || event.start.dateTime!)
-                      const duration = (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60) // hours
-                      const topOffset = (startTime.getMinutes() / 60) * 64 // 64px = 1 hour height
+                      const localEndTime = new Date(endTime.getTime() - (endTime.getTimezoneOffset() * 60000))
+                      const duration = (localEndTime.getTime() - localStartTime.getTime()) / (1000 * 60 * 60) // hours
+                      const topOffset = (localStartTime.getMinutes() / 60) * 64 // 64px = 1 hour height
                       const height = Math.max(duration * 64, 20) // minimum height of 20px
                       
                       // Determine if this is a "need to book" event
@@ -391,12 +435,12 @@ export default function NeedToBookPage() {
                             zIndex: eventIndex + 1
                           }}
                           onClick={() => openInGoogleCalendar(event)}
-                          title={`${event.summary} - ${formatTime(event.start.dateTime!)}`}
+                          title={`${event.summary} - ${formatTime(localStartTime.toISOString())}`}
                         >
                           <div className="font-medium truncate">{event.summary}</div>
                           {height > 30 && (
                             <div className="text-xs opacity-90 truncate">
-                              {formatTime(event.start.dateTime!)} - {formatTime(event.end.dateTime || event.start.dateTime!)}
+                              {formatTime(localStartTime.toISOString())} - {formatTime(localEndTime.toISOString())}
                             </div>
                           )}
                         </div>
