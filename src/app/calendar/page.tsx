@@ -54,12 +54,16 @@ export default function CalendarPage() {
   const [completedJobs, setCompletedJobs] = useState<Set<string>>(new Set())
   const [selectedCalendarId, setSelectedCalendarId] = useState<string>('all')
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar')
-
+  const [showNearbyJobs, setShowNearbyJobs] = useState(false)
 
   const [startDate, setStartDate] = useState<string>(() => {
-    // Default to today's date in YYYY-MM-DD format
+    // Default to Monday of current week in YYYY-MM-DD format
     const today = new Date()
-    return today.toISOString().split('T')[0]
+    const dayOfWeek = today.getDay()
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek // Sunday = 0, so Monday = 1
+    const monday = new Date(today)
+    monday.setDate(today.getDate() + mondayOffset)
+    return monday.toISOString().split('T')[0]
   })
 
   useEffect(() => {
@@ -416,14 +420,10 @@ export default function CalendarPage() {
     const start = new Date(startDate)
     const weekDates = []
     
-    // Get the start of the week (Sunday)
-    const startOfWeek = new Date(start)
-    startOfWeek.setDate(start.getDate() - start.getDay())
-    
-    // Generate 7 days starting from Sunday
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(startOfWeek)
-      date.setDate(startOfWeek.getDate() + i)
+    // Generate 5 days starting from Monday (startDate should already be Monday)
+    for (let i = 0; i < 5; i++) {
+      const date = new Date(start)
+      date.setDate(start.getDate() + i)
       weekDates.push(date)
     }
     
@@ -442,8 +442,8 @@ export default function CalendarPage() {
       }
     })
     
-    // Add nearby jobs from need-to-book data for this date
-    if (needToBookData) {
+    // Add nearby jobs from need-to-book data for this date only when checkbox is checked
+    if (showNearbyJobs && needToBookData) {
       Object.entries(needToBookData.nearbyJobsByDay).forEach(([dateKey, dayData]) => {
         // Handle both ISO date strings (YYYY-MM-DD) and date strings from the API
         let keyDate: Date
@@ -514,27 +514,37 @@ export default function CalendarPage() {
     
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-        {/* Legend */}
+        {/* Legend and Controls */}
         <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700">
-          <div className="flex items-center space-x-6 text-xs">
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 rounded" style={{ backgroundColor: '#4285f4' }}></div>
-              <span className="text-gray-600 dark:text-gray-400">Regular Events</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-6 text-xs">
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 rounded" style={{ backgroundColor: '#4285f4' }}></div>
+                <span className="text-gray-600 dark:text-gray-400">Calendar Events</span>
+              </div>
             </div>
             <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 rounded border-2 border-green-600" style={{ backgroundColor: '#10b981' }}></div>
-              <span className="text-gray-600 dark:text-gray-400">Nearby Jobs (within 20km)</span>
+              <input
+                type="checkbox"
+                id="nearby-jobs"
+                checked={showNearbyJobs}
+                onChange={(e) => setShowNearbyJobs(e.target.checked)}
+                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+              />
+              <label htmlFor="nearby-jobs" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Show Nearby Jobs
+              </label>
             </div>
           </div>
         </div>
         
         {/* Week header */}
-        <div className="grid grid-cols-8 border-b border-gray-200 dark:border-gray-700">
+        <div className="grid grid-cols-6 border-b border-gray-200 dark:border-gray-700">
           <div className="p-3 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700">
             <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Time</div>
           </div>
           {weekDates.map((date, index) => (
-            <div key={index} className={`p-3 border-r border-gray-200 dark:border-gray-700 ${index === 6 ? 'border-r-0' : ''} ${isToday(date) ? 'bg-blue-50 dark:bg-blue-900/20' : 'bg-gray-50 dark:bg-gray-700'}`}>
+            <div key={index} className={`p-3 border-r border-gray-200 dark:border-gray-700 ${index === 4 ? 'border-r-0' : ''} ${isToday(date) ? 'bg-blue-50 dark:bg-blue-900/20' : 'bg-gray-50 dark:bg-gray-700'}`}>
               <div className="text-center">
                 <div className={`text-sm font-semibold ${isToday(date) ? 'text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white'}`}>
                   {date.toLocaleDateString('en-US', { weekday: 'short' })}
@@ -548,7 +558,7 @@ export default function CalendarPage() {
         </div>
 
         {/* Time slots */}
-        <div className="grid grid-cols-8">
+        <div className="grid grid-cols-6">
           {/* Time column */}
           <div className="border-r border-gray-200 dark:border-gray-700">
             {Array.from({ length: totalHours }, (_, index) => {
@@ -586,7 +596,7 @@ export default function CalendarPage() {
                                              // Determine if this is a nearby job from need-to-book data
                        let isNearbyJob = false
                        let distance = 0
-                       if (needToBookData) {
+                       if (showNearbyJobs && needToBookData) {
                          Object.entries(needToBookData.nearbyJobsByDay).forEach(([, dayData]) => {
                            const typedDayData = dayData as { needToBookEvent: CalendarEvent; nearbyJobs: Array<{ event: CalendarEvent; distance: number }> }
                            const nearbyJob = typedDayData.nearbyJobs.find(({ event: nearbyEvent }) => nearbyEvent.id === event.id)
@@ -597,9 +607,9 @@ export default function CalendarPage() {
                          })
                        }
 
-                      // Use different styling for nearby jobs
-                      const backgroundColor = isNearbyJob ? '#10b981' : (event.backgroundColor || '#4285f4') // Green for nearby jobs
-                      const borderStyle = isNearbyJob ? '2px solid #059669' : 'none' // Border for nearby jobs
+                      // Use original Google Calendar colors for all events
+                      const backgroundColor = event.backgroundColor || '#4285f4'
+                      const borderStyle = 'none'
 
                       return (
                         <div
@@ -725,7 +735,7 @@ export default function CalendarPage() {
               year: 'numeric',
               month: 'long',
               day: 'numeric'
-            })} onwards. Calendar view also shows nearby jobs within 20km of your &quot;Need to book&quot; events.
+            })} onwards. Calendar view shows Monday-Friday work week. Use the checkbox to show nearby jobs within 20km of your &quot;Need to book&quot; events.
           </p>
         </div>
 
