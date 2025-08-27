@@ -51,6 +51,7 @@ export default function NeedToBookPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedCalendarId, setSelectedCalendarId] = useState<string>('all')
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
 
   const [startDate, setStartDate] = useState<string>(() => {
     const today = new Date()
@@ -226,6 +227,191 @@ export default function NeedToBookPage() {
     window.open(event.htmlLink, '_blank', 'noopener,noreferrer')
   }
 
+  const getWeekDates = (startDate: string) => {
+    const start = new Date(startDate)
+    const weekDates = []
+    
+    // Get the start of the week (Sunday)
+    const startOfWeek = new Date(start)
+    startOfWeek.setDate(start.getDate() - start.getDay())
+    
+    // Generate 7 days starting from Sunday
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(startOfWeek)
+      date.setDate(startOfWeek.getDate() + i)
+      weekDates.push(date)
+    }
+    
+    return weekDates
+  }
+
+  const getEventsForDate = (date: Date) => {
+    const dateString = date.toDateString()
+    const events: CalendarEvent[] = []
+    
+    // Add need-to-book events for this date
+    if (data) {
+      data.needToBookEvents.forEach((event: CalendarEvent) => {
+        const eventDate = new Date(event.start.dateTime || event.start.date || '')
+        if (eventDate.toDateString() === dateString) {
+          events.push(event)
+        }
+      })
+      
+      // Add nearby jobs for this date
+      Object.entries(data.nearbyJobsByDay).forEach(([dateKey, dayData]) => {
+        if (new Date(dateKey).toDateString() === dateString) {
+          const typedDayData = dayData as { needToBookEvent: CalendarEvent; nearbyJobs: Array<{ event: CalendarEvent; distance: number }> }
+          typedDayData.nearbyJobs.forEach(({ event }: { event: CalendarEvent; distance: number }) => {
+            events.push(event)
+          })
+        }
+      })
+    }
+    
+    return events
+  }
+
+  const formatTime = (dateTime: string) => {
+    return new Date(dateTime).toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    })
+  }
+
+  const isToday = (date: Date) => {
+    const today = new Date()
+    return date.toDateString() === today.toDateString()
+  }
+
+  const getTimeRangeForWeek = (weekDates: Date[]) => {
+    let earliestHour = 24
+    let latestHour = 0
+    
+    weekDates.forEach(date => {
+      const dateEvents = getEventsForDate(date)
+      dateEvents.forEach((event: CalendarEvent) => {
+        if (event.start.dateTime) {
+          const eventHour = new Date(event.start.dateTime).getHours()
+          earliestHour = Math.min(earliestHour, eventHour)
+          latestHour = Math.max(latestHour, eventHour)
+        }
+      })
+    })
+    
+    // If no events found, default to 8 AM - 6 PM
+    if (earliestHour === 24 && latestHour === 0) {
+      earliestHour = 8
+      latestHour = 18
+    }
+    
+    // Start 2 hours before earliest, end 3 hours after latest
+    const startHour = Math.max(0, earliestHour - 2)
+    const endHour = Math.min(23, latestHour + 3)
+    
+    return { startHour, endHour, totalHours: endHour - startHour + 1 }
+  }
+
+  const renderCalendarView = () => {
+    if (!data) return null
+    
+    const weekDates = getWeekDates(startDate)
+    const { startHour, totalHours } = getTimeRangeForWeek(weekDates)
+    
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+        {/* Week header */}
+        <div className="grid grid-cols-8 border-b border-gray-200 dark:border-gray-700">
+          <div className="p-3 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700">
+            <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Time</div>
+          </div>
+          {weekDates.map((date, index) => (
+            <div key={index} className={`p-3 border-r border-gray-200 dark:border-gray-700 ${index === 6 ? 'border-r-0' : ''} ${isToday(date) ? 'bg-blue-50 dark:bg-blue-900/20' : 'bg-gray-50 dark:bg-gray-700'}`}>
+              <div className="text-center">
+                <div className={`text-sm font-semibold ${isToday(date) ? 'text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white'}`}>
+                  {date.toLocaleDateString('en-US', { weekday: 'short' })}
+                </div>
+                <div className={`text-lg font-bold ${isToday(date) ? 'text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white'}`}>
+                  {date.getDate()}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Time slots */}
+        <div className="grid grid-cols-8">
+          {/* Time column */}
+          <div className="border-r border-gray-200 dark:border-gray-700">
+            {Array.from({ length: totalHours }, (_, index) => {
+              const hour = startHour + index
+              return (
+                <div key={hour} className="h-16 border-b border-gray-100 dark:border-gray-600 flex items-center justify-end pr-2">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    {hour === 0 ? '12 AM' : hour === 12 ? '12 PM' : hour > 12 ? `${hour - 12} PM` : `${hour} AM`}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Day columns */}
+          {weekDates.map((date, dayIndex) => (
+            <div key={dayIndex} className={`border-r border-gray-200 dark:border-gray-700 ${dayIndex === 6 ? 'border-r-0' : ''}`}>
+              {Array.from({ length: totalHours }, (_, index) => {
+                const hour = startHour + index
+                const hourEvents = getEventsForDate(date).filter(event => {
+                  if (!event.start.dateTime) return false
+                  const eventHour = new Date(event.start.dateTime).getHours()
+                  return eventHour === hour
+                })
+
+                return (
+                  <div key={hour} className="h-16 border-b border-gray-100 dark:border-gray-600 relative">
+                    {hourEvents.map((event: CalendarEvent, eventIndex) => {
+                      const startTime = new Date(event.start.dateTime!)
+                      const endTime = new Date(event.end.dateTime || event.start.dateTime!)
+                      const duration = (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60) // hours
+                      const topOffset = (startTime.getMinutes() / 60) * 64 // 64px = 1 hour height
+                      const height = Math.max(duration * 64, 20) // minimum height of 20px
+                      
+                      // Determine if this is a "need to book" event
+                      const isNeedToBook = data.needToBookEvents.some(ntbEvent => ntbEvent.id === event.id)
+                      const backgroundColor = isNeedToBook ? '#f97316' : (event.backgroundColor || '#4285f4')
+
+                      return (
+                        <div
+                          key={event.id}
+                          className="absolute left-1 right-1 rounded px-2 py-1 text-xs text-white overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
+                          style={{
+                            top: `${topOffset}px`,
+                            height: `${height}px`,
+                            backgroundColor,
+                            zIndex: eventIndex + 1
+                          }}
+                          onClick={() => openInGoogleCalendar(event)}
+                          title={`${event.summary} - ${formatTime(event.start.dateTime!)}`}
+                        >
+                          <div className="font-medium truncate">{event.summary}</div>
+                          {height > 30 && (
+                            <div className="text-xs opacity-90 truncate">
+                              {formatTime(event.start.dateTime!)} - {formatTime(event.end.dateTime || event.start.dateTime!)}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   if (status === 'loading') {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
@@ -268,6 +454,36 @@ export default function NeedToBookPage() {
               </div>
             </div>
           </div>
+          
+          {/* View Mode Toggle */}
+          <div className="flex items-center space-x-2 mb-4">
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              View Mode:
+            </label>
+            <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+              <button
+                onClick={() => setViewMode('list')}
+                className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+                  viewMode === 'list'
+                    ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                📋 List View
+              </button>
+              <button
+                onClick={() => setViewMode('calendar')}
+                className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+                  viewMode === 'calendar'
+                    ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                📅 Calendar View
+              </button>
+            </div>
+          </div>
+          
           <p className="text-gray-600 dark:text-gray-400">
             Events with &quot;Need to book&quot; in the title and nearby jobs within 20km
           </p>
@@ -309,181 +525,131 @@ export default function NeedToBookPage() {
         )}
 
         {!loading && !error && data && (
-          <>
-            {data.needToBookEvents.length > 0 && (
-              <div className="mb-8">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                  All &quot;Need to Book&quot; Events ({data.needToBookEvents.length})
-                </h2>
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-                  <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                    {data.needToBookEvents.map(event => (
-                      <div key={event.id} className="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                        <div className="flex items-start space-x-3">
-                          <div className="flex-shrink-0 w-2 h-2 bg-orange-500 rounded-full mt-2"></div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between">
-                              <div className="flex-1">
-                                <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                                  {event.summary || 'Untitled Event'}
-                                </h3>
-                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                  {formatEventDate(event)}
-                                </p>
-                                {event.location && (
-                                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex items-center">
-                                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                                    </svg>
-                                    {event.location}
-                                  </p>
-                                )}
-                                {event.description && (
-                                  <p className="text-xs text-gray-600 dark:text-gray-300 mt-2 line-clamp-2">
-                                    {event.description}
-                                  </p>
-                                )}
-                              </div>
-                              <div className="flex items-center space-x-2 mt-3 sm:mt-0 sm:ml-4">
-                                <button
-                                  onClick={() => openInGoogleCalendar(event)}
-                                  className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs font-medium transition-colors flex items-center space-x-1"
-                                >
-                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                  </svg>
-                                  <span>View in Calendar</span>
-                                </button>
-                                {event.location && (
-                                  <button
-                                    onClick={() => openGoogleMapsRoute(event.location!)}
-                                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors flex items-center space-x-1"
-                                  >
-                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                                    </svg>
-                                    <span>Get Directions</span>
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {Object.keys(data.nearbyJobsByDay).length > 0 && (
-              <div className="mb-8">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                  Optimal Booking Days - Jobs Within 20km ({Object.keys(data.nearbyJobsByDay).length} opportunities)
-                </h2>
-                <div className="space-y-6">
-                  {Object.entries(data.nearbyJobsByDay)
-                    .sort(([a], [b]) => new Date(a).getTime() - new Date(b).getTime())
-                    .map(([dateKey, dayData]) => (
-                      <div key={dateKey} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-                        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-green-50 dark:bg-green-900/20">
-                          <h3 className="text-lg font-semibold text-green-800 dark:text-green-200">
-                            📍 {new Date(dateKey).toLocaleDateString('en-US', {
-                              weekday: 'long',
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric'
-                            })} - Book on this day!
-                          </h3>
-                          <p className="text-sm text-green-600 dark:text-green-300 mt-1">
-                            {dayData.nearbyJobs.length} job{dayData.nearbyJobs.length !== 1 ? 's' : ''} within 20km of your &quot;Need to book&quot; location
-                          </p>
-                        </div>
-                        
-                        <div className="px-6 py-4 bg-orange-50 dark:bg-orange-900/20 border-b border-gray-200 dark:border-gray-700">
-                          <div className="flex items-start space-x-3">
-                            <div className="flex-shrink-0 w-3 h-3 bg-orange-500 rounded-full mt-2"></div>
-                            <div className="flex-1">
-                              <h4 className="font-medium text-orange-800 dark:text-orange-200 text-sm">
-                                Need to Book: {dayData.needToBookEvent.summary}
-                              </h4>
-                              <p className="text-xs text-orange-600 dark:text-orange-300 mt-1">
-                                {formatEventDate(dayData.needToBookEvent)}
-                              </p>
-                              {dayData.needToBookEvent.location && (
-                                <p className="text-xs text-orange-600 dark:text-orange-300 mt-1 flex items-center">
-                                  <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                                  </svg>
-                                  {dayData.needToBookEvent.location}
-                                </p>
-                              )}
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <button
-                                onClick={() => openInGoogleCalendar(dayData.needToBookEvent)}
-                                className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded text-xs font-medium transition-colors"
-                              >
-                                View
-                              </button>
-                              {dayData.needToBookEvent.location && (
-                                <button
-                                  onClick={() => openGoogleMapsRoute(dayData.needToBookEvent.location!)}
-                                  className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors"
-                                >
-                                  Directions
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                          {dayData.nearbyJobs.map(({ event, distance }) => (
-                            <div key={event.id} className="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                              <div className="flex items-start space-x-3">
-                                <div 
-                                  className="flex-shrink-0 w-2 h-2 rounded-full mt-2"
-                                  style={{ 
-                                    backgroundColor: event.backgroundColor || '#4285f4'
-                                  }}
-                                  title={`Calendar: ${event.calendarId || 'Primary'}`}
-                                ></div>
-                                <div className="flex-1">
-                                  <div className="flex items-center space-x-2">
-                                    <h4 className="text-sm font-medium text-gray-900 dark:text-white">
+          <div className="space-y-6">
+            {viewMode === 'list' ? (
+              <>
+                {data.needToBookEvents.length > 0 && (
+                  <div className="mb-8">
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                      All &quot;Need to Book&quot; Events ({data.needToBookEvents.length})
+                    </h2>
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                      <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                        {data.needToBookEvents.map(event => (
+                          <div key={event.id} className="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                            <div className="flex items-start space-x-3">
+                              <div className="flex-shrink-0 w-2 h-2 bg-orange-500 rounded-full mt-2"></div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between">
+                                  <div className="flex-1">
+                                    <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">
                                       {event.summary || 'Untitled Event'}
-                                    </h4>
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                                      {distance.toFixed(1)}km away
-                                    </span>
+                                    </h3>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                      {formatEventDate(event)}
+                                    </p>
+                                    {event.location && (
+                                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex items-center">
+                                        <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        </svg>
+                                        {event.location}
+                                      </p>
+                                    )}
+                                    {event.description && (
+                                      <p className="text-xs text-gray-600 dark:text-gray-300 mt-2 line-clamp-2">
+                                        {event.description}
+                                      </p>
+                                    )}
                                   </div>
-                                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                    {formatEventDate(event)}
+                                  <div className="flex items-center space-x-2 mt-3 sm:mt-0 sm:ml-4">
+                                    <button
+                                      onClick={() => openInGoogleCalendar(event)}
+                                      className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs font-medium transition-colors flex items-center space-x-1"
+                                    >
+                                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 002 2z" />
+                                      </svg>
+                                      <span>View in Calendar</span>
+                                    </button>
+                                    {event.location && (
+                                      <button
+                                        onClick={() => openGoogleMapsRoute(event.location!)}
+                                        className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors flex items-center space-x-1"
+                                      >
+                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        </svg>
+                                        <span>Get Directions</span>
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {Object.keys(data.nearbyJobsByDay).length > 0 && (
+                  <div className="mb-8">
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                      Optimal Booking Days - Jobs Within 20km ({Object.keys(data.nearbyJobsByDay).length} opportunities)
+                    </h2>
+                    <div className="space-y-6">
+                      {Object.entries(data.nearbyJobsByDay)
+                        .sort(([a], [b]) => new Date(a).getTime() - new Date(b).getTime())
+                        .map(([dateKey, dayData]) => (
+                          <div key={dateKey} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-green-50 dark:bg-green-900/20">
+                              <h3 className="text-lg font-semibold text-green-800 dark:text-green-200">
+                                📍 {new Date(dateKey).toLocaleDateString('en-US', {
+                                  weekday: 'long',
+                                  year: 'numeric',
+                                  month: 'long',
+                                  day: 'numeric'
+                                })} - Book on this day!
+                              </h3>
+                              <p className="text-sm text-green-600 dark:text-green-300 mt-1">
+                                {dayData.nearbyJobs.length} job{dayData.nearbyJobs.length !== 1 ? 's' : ''} within 20km of your &quot;Need to book&quot; location
+                              </p>
+                            </div>
+                            
+                            <div className="px-6 py-4 bg-orange-50 dark:bg-orange-900/20 border-b border-gray-200 dark:border-gray-700">
+                              <div className="flex items-start space-x-3">
+                                <div className="flex-shrink-0 w-3 h-3 bg-orange-500 rounded-full mt-2"></div>
+                                <div className="flex-1">
+                                  <h4 className="font-medium text-orange-800 dark:text-orange-200 text-sm">
+                                    Need to Book: {dayData.needToBookEvent.summary}
+                                  </h4>
+                                  <p className="text-xs text-orange-600 dark:text-orange-300 mt-1">
+                                    {formatEventDate(dayData.needToBookEvent)}
                                   </p>
-                                  {event.location && (
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex items-center">
+                                  {dayData.needToBookEvent.location && (
+                                    <p className="text-xs text-orange-600 dark:text-orange-300 mt-1 flex items-center">
                                       <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                                       </svg>
-                                      {event.location}
+                                      {dayData.needToBookEvent.location}
                                     </p>
                                   )}
                                 </div>
                                 <div className="flex items-center space-x-2">
                                   <button
-                                    onClick={() => openInGoogleCalendar(event)}
-                                    className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs font-medium transition-colors"
+                                    onClick={() => openInGoogleCalendar(dayData.needToBookEvent)}
+                                    className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded text-xs font-medium transition-colors"
                                   >
                                     View
                                   </button>
-                                  {event.location && (
+                                  {dayData.needToBookEvent.location && (
                                     <button
-                                      onClick={() => openGoogleMapsRoute(event.location!)}
+                                      onClick={() => openGoogleMapsRoute(dayData.needToBookEvent.location!)}
                                       className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors"
                                     >
                                       Directions
@@ -492,30 +658,87 @@ export default function NeedToBookPage() {
                                 </div>
                               </div>
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            )}
 
-            {data.needToBookEvents.length === 0 && (
-              <div className="text-center py-12">
-                <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                </svg>
-                <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No &quot;Need to book&quot; events found</h3>
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  You don&apos;t have any events with &quot;Need to book&quot; in the title from {new Date(startDate).toLocaleDateString('en-US', {
-                    month: 'long',
-                    day: 'numeric',
-                    year: 'numeric'
-                  })} onwards.
-                </p>
-              </div>
+                            <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                              {dayData.nearbyJobs.map(({ event, distance }) => (
+                                <div key={event.id} className="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                                  <div className="flex items-start space-x-3">
+                                    <div 
+                                      className="flex-shrink-0 w-2 h-2 rounded-full mt-2"
+                                      style={{ 
+                                        backgroundColor: event.backgroundColor || '#4285f4'
+                                      }}
+                                      title={`Calendar: ${event.calendarId || 'Primary'}`}
+                                    ></div>
+                                    <div className="flex-1">
+                                      <div className="flex items-center space-x-2">
+                                        <h4 className="text-sm font-medium text-gray-900 dark:text-white">
+                                          {event.summary || 'Untitled Event'}
+                                        </h4>
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                          {distance.toFixed(1)}km away
+                                        </span>
+                                      </div>
+                                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                        {formatEventDate(event)}
+                                      </p>
+                                      {event.location && (
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex items-center">
+                                          <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                          </svg>
+                                          {event.location}
+                                        </p>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                      <button
+                                        onClick={() => openInGoogleCalendar(event)}
+                                        className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs font-medium transition-colors"
+                                      >
+                                        View
+                                      </button>
+                                      {event.location && (
+                                        <button
+                                          onClick={() => openGoogleMapsRoute(event.location!)}
+                                          className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors"
+                                        >
+                                          Directions
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {data.needToBookEvents.length === 0 && (
+                  <div className="text-center py-12">
+                    <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                    </svg>
+                    <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No &quot;Need to book&quot; events found</h3>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                      You don&apos;t have any events with &quot;Need to book&quot; in the title from {new Date(startDate).toLocaleDateString('en-US', {
+                        month: 'long',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })} onwards.
+                    </p>
+                  </div>
+                )}
+              </>
+            ) : (
+              // Calendar View
+              renderCalendarView()
             )}
-          </>
+          </div>
         )}
       </div>
     </div>
