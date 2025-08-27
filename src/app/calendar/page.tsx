@@ -64,6 +64,7 @@ export default function CalendarPage() {
   const [showNearbyJobs, setShowNearbyJobs] = useState(false)
   const [selectedNeedToBookEvent, setSelectedNeedToBookEvent] = useState<string>('')
   const [calendarColors, setCalendarColors] = useState<{ [key: string]: string }>({})
+  const [calendarNames, setCalendarNames] = useState<{ [key: string]: string }>({})
 
   const [startDate, setStartDate] = useState<string>(() => {
     // Default to Monday of current week in YYYY-MM-DD format
@@ -109,10 +110,13 @@ export default function CalendarPage() {
       if (calendarsResponse.ok) {
         const calendarsData = await calendarsResponse.json()
         const colors: { [key: string]: string } = {}
+        const calendarNames: { [key: string]: string } = {}
         calendarsData.calendars?.forEach((calendar: CalendarData) => {
           colors[calendar.id] = calendar.backgroundColor || '#4285f4'
+          calendarNames[calendar.id] = calendar.summary
         })
         setCalendarColors(colors)
+        setCalendarNames(calendarNames)
       }
     } catch (err) {
       console.warn('Failed to fetch calendar colors:', err)
@@ -121,52 +125,19 @@ export default function CalendarPage() {
 
   const fetchNeedToBookData = async () => {
     try {
-      if (selectedCalendarId === 'all') {
-        // Fetch from all calendars
-        const calendarsResponse = await fetch('/api/calendar/calendars')
-        if (!calendarsResponse.ok) {
-          throw new Error('Failed to fetch calendars list')
-        }
-        const calendarsData = await calendarsResponse.json()
-        const calendars = calendarsData.calendars || []
-        
-        const allNeedToBookData: NearbyJobsResponse = {
-          needToBookEvents: [],
-          nearbyJobsByDay: {}
-        }
-        
-        for (const calendar of calendars as CalendarData[]) {
-          try {
-            const url = `/api/calendar/need-to-book?startDate=${startDate}&calendarId=${encodeURIComponent(calendar.id)}`
-            const response = await fetch(url)
-            if (response.ok) {
-              const data = await response.json()
-              allNeedToBookData.needToBookEvents.push(...(data.needToBookEvents || []))
-              Object.assign(allNeedToBookData.nearbyJobsByDay, data.nearbyJobsByDay || {})
-            }
-          } catch (err) {
-            console.warn(`Failed to fetch need-to-book data from calendar ${calendar.summary}:`, err)
-          }
-        }
-        
-        setNeedToBookData(allNeedToBookData)
+      // The API now automatically finds the "Need to Book" calendar
+      const url = `/api/calendar/need-to-book?startDate=${startDate}`
+      const response = await fetch(url)
+      
+      if (response.ok) {
+        const data = await response.json()
+        setNeedToBookData(data)
         // Set first need-to-book event as default selection
-        if (allNeedToBookData.needToBookEvents.length > 0 && !selectedNeedToBookEvent) {
-          setSelectedNeedToBookEvent(allNeedToBookData.needToBookEvents[0].id)
+        if (data.needToBookEvents?.length > 0 && !selectedNeedToBookEvent) {
+          setSelectedNeedToBookEvent(data.needToBookEvents[0].id)
         }
       } else {
-        // Fetch from specific calendar
-        const url = `/api/calendar/need-to-book?startDate=${startDate}&calendarId=${encodeURIComponent(selectedCalendarId)}`
-        const response = await fetch(url)
-        
-        if (response.ok) {
-          const data = await response.json()
-          setNeedToBookData(data)
-          // Set first need-to-book event as default selection
-          if (data.needToBookEvents?.length > 0 && !selectedNeedToBookEvent) {
-            setSelectedNeedToBookEvent(data.needToBookEvents[0].id)
-          }
-        }
+        console.warn('Failed to fetch need-to-book data:', response.statusText)
       }
     } catch (err) {
       console.warn('Failed to fetch need-to-book data:', err)
@@ -609,7 +580,7 @@ export default function CalendarPage() {
                 <div key={calendarId} className="flex items-center space-x-2">
                   <div className="w-3 h-3 rounded" style={{ backgroundColor: color }}></div>
                   <span className="text-gray-600 dark:text-gray-400">
-                    {calendarId === 'primary' ? 'Primary' : calendarId.split('@')[0]}
+                    {calendarNames[calendarId] || (calendarId === 'primary' ? 'Primary' : calendarId)}
                   </span>
                 </div>
               ))}
@@ -855,7 +826,7 @@ export default function CalendarPage() {
               year: 'numeric',
               month: 'long',
               day: 'numeric'
-            })} onwards. Calendar view shows Monday-Friday work week. Use the checkbox to show nearby jobs within 20km of your &quot;Need to book&quot; events. Nearby jobs will be highlighted in yellow.
+            })} onwards. Calendar view shows Monday-Friday work week. Use the checkbox to show nearby jobs within 20km of your events from the &quot;Need to Book&quot; calendar. Nearby jobs will be highlighted in yellow.
           </p>
         </div>
 

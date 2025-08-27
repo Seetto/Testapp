@@ -100,10 +100,9 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get start date and calendar ID from URL parameters
+    // Get start date from URL parameters
     const { searchParams } = new URL(request.url)
     const startDateParam = searchParams.get('startDate')
-    const calendarIdParam = searchParams.get('calendarId') || 'primary'
     
     // Create OAuth2 client
     const oauth2Client = new google.auth.OAuth2()
@@ -114,6 +113,29 @@ export async function GET(request: Request) {
     // Create Calendar API client
     const calendar = google.calendar({ version: 'v3', auth: oauth2Client })
 
+    // First, find the "Need to Book" calendar by name
+    console.log('Searching for "Need to Book" calendar...')
+    const calendarListResponse = await calendar.calendarList.list({
+      maxResults: 100,
+      showHidden: false,
+    })
+    
+    const allCalendars = calendarListResponse.data.items || []
+    const needToBookCalendar = allCalendars.find(cal => 
+      cal.summary && cal.summary.toLowerCase().includes('need to book')
+    )
+    
+    if (!needToBookCalendar) {
+      console.log('No "Need to Book" calendar found')
+      return NextResponse.json({ 
+        needToBookEvents: [],
+        nearbyJobsByDay: {},
+        warning: 'No "Need to Book" calendar found. Please create a calendar with "Need to Book" in the name.'
+      })
+    }
+    
+    console.log(`Found "Need to Book" calendar: ${needToBookCalendar.summary} (${needToBookCalendar.id})`)
+
     // Set date range based on start date parameter or default to today
     const startDate = startDateParam ? new Date(startDateParam) : new Date()
     startDate.setHours(0, 0, 0, 0)
@@ -122,11 +144,11 @@ export async function GET(request: Request) {
     const endDate = new Date(startDate)
     endDate.setDate(startDate.getDate() + 90)
 
-    console.log('Fetching all calendar events for need-to-book analysis...')
-    console.log('Calendar ID:', calendarIdParam)
+    console.log('Fetching all calendar events from "Need to Book" calendar...')
+    console.log('Calendar ID:', needToBookCalendar.id)
     
     const response = await calendar.events.list({
-      calendarId: calendarIdParam,
+      calendarId: needToBookCalendar.id!,
       timeMin: startDate.toISOString(),
       timeMax: endDate.toISOString(),
       maxResults: 500, // Increased to get more events for analysis
@@ -136,12 +158,10 @@ export async function GET(request: Request) {
 
     const allEvents = (response.data.items as CalendarEvent[]) || []
     
-    // Filter events with "Need to book" in the title (case insensitive)
-    const needToBookEvents = allEvents.filter(event => 
-      event.summary && event.summary.toLowerCase().includes('need to book')
-    )
+    // Get all events from the calendar (since we're now looking in a specific "Need to Book" calendar)
+    const needToBookEvents = allEvents
 
-    console.log(`Found ${needToBookEvents.length} "Need to book" events out of ${allEvents.length} total events`)
+    console.log(`Found ${needToBookEvents.length} events from "Need to Book" calendar`)
 
     // For distance calculations, we need Google Maps API key
     const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
@@ -168,32 +188,79 @@ export async function GET(request: Request) {
       // Use ISO date string (YYYY-MM-DD) for consistent date handling across timezones
       const dayKey = eventDate.toISOString().split('T')[0]
 
-      // Check events within 7 days before and after
+      // Check events within 7 days before and after from all accessible calendars
       const nearbyEvents: Array<{event: CalendarEvent, distance: number}> = []
 
-      for (const event of allEvents) {
-        // Skip the "Need to book" event itself and events without locations
-        if (event.id === needToBookEvent.id || !event.location || 
-            event.summary?.toLowerCase().includes('need to book')) continue
-
-        const eventDate = new Date(event.start.dateTime || event.start.date || '')
-        const dayDifference = Math.abs((eventDate.getTime() - new Date(needToBookEvent.start.dateTime || needToBookEvent.start.date || '').getTime()) / (1000 * 60 * 60 * 24))
+      // Get all accessible calendars to search for nearby jobs
+      const allCalendarsResponse = await calendar.calendarList.list({
+        maxResults: 100,
+        showHidden: false,
+      })
+      
+      const accessibleCalendars = allCalendarsResponse.data.items || []
+      
+      for (const accessibleCalendar of accessibleCalendars) {
+        // Skip the "Need to Book" calendar itself and any calendar with "need to book" in the name
+        if (accessibleCalendar.id === needToBookCalendar.id || 
+            (accessibleCalendar.summary && accessibleCalendar.summary.toLowerCase().includes('need to book'))) continue
         
-        // Only consider events within 7 days
-        if (dayDifference > 7) continue
+        try {
+          // Get events from this calendar
+          const calendarEventsResponse = await calendar.events.list({
+            calendarId: accessibleCalendar.id!,
+            timeMin: startDate.toISOString(),
+            timeMax: endDate.toISOString(),
+            maxResults: 250,
+            singleEvents: true,
+            orderBy: 'startTime',
+          })
+          
+          const calendarEvents = calendarEventsResponse.data.items || []
+          
+                     for (const event of calendarEvents) {
+             // Skip events without locations or IDs
+             if (!event.location || !event.id || !event.start) continue
 
-        console.log(`Checking event: ${event.summary} at ${event.location} (${dayDifference} days difference)`)
+             const eventDate = new Date(event.start.dateTime || event.start.date || '')
+             const dayDifference = Math.abs((eventDate.getTime() - new Date(needToBookEvent.start.dateTime || needToBookEvent.start.date || '').getTime()) / (1000 * 60 * 60 * 24))
+             
+             // Only consider events within 7 days
+             if (dayDifference > 7) continue
 
-        // Get driving distance using Google Distance Matrix API
-        const distance = await getDrivingDistance(
-          needToBookEvent.location,
-          event.location,
-          googleMapsApiKey
-        )
+             console.log(`Checking event: ${event.summary} at ${event.location} (${dayDifference} days difference) from calendar ${accessibleCalendar.summary}`)
 
-        if (distance !== null && distance <= 20) {
-          console.log(`Found nearby job: ${event.summary} - ${distance.toFixed(1)}km away`)
-          nearbyEvents.push({ event, distance })
+             // Get driving distance using Google Distance Matrix API
+             const distance = await getDrivingDistance(
+               needToBookEvent.location,
+               event.location,
+               googleMapsApiKey
+             )
+
+             if (distance !== null && distance <= 20) {
+               console.log(`Found nearby job: ${event.summary} - ${distance.toFixed(1)}km away`)
+               // Cast the event to CalendarEvent type
+               const calendarEvent: CalendarEvent = {
+                 id: event.id,
+                 summary: event.summary || '',
+                 description: event.description || undefined,
+                 start: {
+                   dateTime: event.start.dateTime || undefined,
+                   date: event.start.date || undefined,
+                   timeZone: event.start.timeZone || undefined
+                 },
+                 end: {
+                   dateTime: event.end?.dateTime || event.start.dateTime || undefined,
+                   date: event.end?.date || event.start.date || undefined,
+                   timeZone: event.end?.timeZone || event.start.timeZone || undefined
+                 },
+                 location: event.location,
+                 htmlLink: event.htmlLink || ''
+               }
+               nearbyEvents.push({ event: calendarEvent, distance })
+             }
+           }
+        } catch (err) {
+          console.warn(`Failed to fetch events from calendar ${accessibleCalendar.summary}:`, err)
         }
       }
 
