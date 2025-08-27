@@ -31,14 +31,31 @@ interface CalendarEvent {
   foregroundColor?: string
 }
 
+interface NearbyJobsResponse {
+  needToBookEvents: CalendarEvent[]
+  nearbyJobsByDay: {
+    [date: string]: {
+      needToBookEvent: CalendarEvent
+      nearbyJobs: Array<{
+        event: CalendarEvent
+        distance: number
+      }>
+    }
+  }
+  warning?: string
+}
+
 export default function CalendarPage() {
   const { data: session, status } = useSession()
   const [events, setEvents] = useState<CalendarEvent[]>([])
+  const [needToBookData, setNeedToBookData] = useState<NearbyJobsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [completedJobs, setCompletedJobs] = useState<Set<string>>(new Set())
   const [selectedCalendarId, setSelectedCalendarId] = useState<string>('all')
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar')
+
+
   const [startDate, setStartDate] = useState<string>(() => {
     // Default to today's date in YYYY-MM-DD format
     const today = new Date()
@@ -54,8 +71,57 @@ export default function CalendarPage() {
   useEffect(() => {
     if ((session as ExtendedSession)?.accessToken) {
       fetchCalendarEvents()
+      if (viewMode === 'calendar') {
+        fetchNeedToBookData()
+      }
     }
-  }, [session, startDate, selectedCalendarId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [session, startDate, selectedCalendarId, viewMode]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const fetchNeedToBookData = async () => {
+    try {
+      if (selectedCalendarId === 'all') {
+        // Fetch from all calendars
+        const calendarsResponse = await fetch('/api/calendar/calendars')
+        if (!calendarsResponse.ok) {
+          throw new Error('Failed to fetch calendars list')
+        }
+        const calendarsData = await calendarsResponse.json()
+        const calendars = calendarsData.calendars || []
+        
+        const allNeedToBookData: NearbyJobsResponse = {
+          needToBookEvents: [],
+          nearbyJobsByDay: {}
+        }
+        
+        for (const calendar of calendars) {
+          try {
+            const url = `/api/calendar/need-to-book?startDate=${startDate}&calendarId=${encodeURIComponent(calendar.id)}`
+            const response = await fetch(url)
+            if (response.ok) {
+              const data = await response.json()
+              allNeedToBookData.needToBookEvents.push(...(data.needToBookEvents || []))
+              Object.assign(allNeedToBookData.nearbyJobsByDay, data.nearbyJobsByDay || {})
+            }
+          } catch (err) {
+            console.warn(`Failed to fetch need-to-book data from calendar ${calendar.summary}:`, err)
+          }
+        }
+        
+        setNeedToBookData(allNeedToBookData)
+      } else {
+        // Fetch from specific calendar
+        const url = `/api/calendar/need-to-book?startDate=${startDate}&calendarId=${encodeURIComponent(selectedCalendarId)}`
+        const response = await fetch(url)
+        
+        if (response.ok) {
+          const data = await response.json()
+          setNeedToBookData(data)
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to fetch need-to-book data:', err)
+    }
+  }
 
   const fetchCalendarEvents = async () => {
     try {
@@ -366,10 +432,39 @@ export default function CalendarPage() {
 
   const getEventsForDate = (date: Date) => {
     const dateString = date.toDateString()
-    return events.filter((event: CalendarEvent) => {
+    const eventsForDate: CalendarEvent[] = []
+    
+    // Add regular calendar events for this date
+    events.forEach((event: CalendarEvent) => {
       const eventDate = new Date(event.start.dateTime || event.start.date || '')
-      return eventDate.toDateString() === dateString
+      if (eventDate.toDateString() === dateString) {
+        eventsForDate.push(event)
+      }
     })
+    
+    // Add nearby jobs from need-to-book data for this date
+    if (needToBookData) {
+      Object.entries(needToBookData.nearbyJobsByDay).forEach(([dateKey, dayData]) => {
+        // Handle both ISO date strings (YYYY-MM-DD) and date strings from the API
+        let keyDate: Date
+        if (dateKey.includes('-')) {
+          // ISO date format (YYYY-MM-DD)
+          keyDate = new Date(dateKey + 'T00:00:00')
+        } else {
+          // Legacy date string format
+          keyDate = new Date(dateKey)
+        }
+        
+        if (keyDate.toDateString() === dateString) {
+          const typedDayData = dayData as { needToBookEvent: CalendarEvent; nearbyJobs: Array<{ event: CalendarEvent; distance: number }> }
+          typedDayData.nearbyJobs.forEach(({ event }) => {
+            eventsForDate.push(event)
+          })
+        }
+      })
+    }
+    
+    return eventsForDate
   }
 
   const formatTime = (dateTime: string) => {
@@ -419,6 +514,20 @@ export default function CalendarPage() {
     
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+        {/* Legend */}
+        <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700">
+          <div className="flex items-center space-x-6 text-xs">
+            <div className="flex items-center space-x-2">
+              <div className="w-3 h-3 rounded" style={{ backgroundColor: '#4285f4' }}></div>
+              <span className="text-gray-600 dark:text-gray-400">Regular Events</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="w-3 h-3 rounded border-2 border-green-600" style={{ backgroundColor: '#10b981' }}></div>
+              <span className="text-gray-600 dark:text-gray-400">Nearby Jobs (within 20km)</span>
+            </div>
+          </div>
+        </div>
+        
         {/* Week header */}
         <div className="grid grid-cols-8 border-b border-gray-200 dark:border-gray-700">
           <div className="p-3 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700">
@@ -474,6 +583,24 @@ export default function CalendarPage() {
                       const topOffset = (startTime.getMinutes() / 60) * 64 // 64px = 1 hour height
                       const height = Math.max(duration * 64, 20) // minimum height of 20px
 
+                                             // Determine if this is a nearby job from need-to-book data
+                       let isNearbyJob = false
+                       let distance = 0
+                       if (needToBookData) {
+                         Object.entries(needToBookData.nearbyJobsByDay).forEach(([, dayData]) => {
+                           const typedDayData = dayData as { needToBookEvent: CalendarEvent; nearbyJobs: Array<{ event: CalendarEvent; distance: number }> }
+                           const nearbyJob = typedDayData.nearbyJobs.find(({ event: nearbyEvent }) => nearbyEvent.id === event.id)
+                           if (nearbyJob) {
+                             isNearbyJob = true
+                             distance = nearbyJob.distance
+                           }
+                         })
+                       }
+
+                      // Use different styling for nearby jobs
+                      const backgroundColor = isNearbyJob ? '#10b981' : (event.backgroundColor || '#4285f4') // Green for nearby jobs
+                      const borderStyle = isNearbyJob ? '2px solid #059669' : 'none' // Border for nearby jobs
+
                       return (
                         <div
                           key={event.id}
@@ -481,16 +608,18 @@ export default function CalendarPage() {
                           style={{
                             top: `${topOffset}px`,
                             height: `${height}px`,
-                            backgroundColor: event.backgroundColor || '#4285f4',
+                            backgroundColor,
+                            border: borderStyle,
                             zIndex: eventIndex + 1
                           }}
                           onClick={() => openInGoogleCalendar(event)}
-                          title={`${event.summary} - ${formatTime(event.start.dateTime!)}`}
+                          title={`${event.summary} - ${formatTime(event.start.dateTime!)}${isNearbyJob ? ` (${distance.toFixed(1)}km away)` : ''}`}
                         >
                           <div className="font-medium truncate">{event.summary}</div>
                           {height > 30 && (
                             <div className="text-xs opacity-90 truncate">
                               {formatTime(event.start.dateTime!)} - {formatTime(event.end.dateTime || event.start.dateTime!)}
+                              {isNearbyJob && <span className="ml-1">({distance.toFixed(1)}km)</span>}
                             </div>
                           )}
                         </div>
@@ -561,7 +690,9 @@ export default function CalendarPage() {
             </label>
             <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
               <button
-                onClick={() => setViewMode('list')}
+                onClick={() => {
+                  setViewMode('list')
+                }}
                 className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
                   viewMode === 'list'
                     ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
@@ -571,7 +702,12 @@ export default function CalendarPage() {
                 📋 List View
               </button>
               <button
-                onClick={() => setViewMode('calendar')}
+                onClick={() => {
+                  setViewMode('calendar')
+                  if ((session as ExtendedSession)?.accessToken) {
+                    fetchNeedToBookData()
+                  }
+                }}
                 className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
                   viewMode === 'calendar'
                     ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
@@ -589,7 +725,7 @@ export default function CalendarPage() {
               year: 'numeric',
               month: 'long',
               day: 'numeric'
-            })} onwards
+            })} onwards. Calendar view also shows nearby jobs within 20km of your &quot;Need to book&quot; events.
           </p>
         </div>
 
