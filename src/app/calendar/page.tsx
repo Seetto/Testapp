@@ -366,7 +366,7 @@ export default function CalendarPage() {
 
   const getEventsForDate = (date: Date) => {
     const dateString = date.toDateString()
-    return events.filter(event => {
+    return events.filter((event: CalendarEvent) => {
       const eventDate = new Date(event.start.dateTime || event.start.date || '')
       return eventDate.toDateString() === dateString
     })
@@ -385,8 +385,37 @@ export default function CalendarPage() {
     return date.toDateString() === today.toDateString()
   }
 
+  const getTimeRangeForWeek = (weekDates: Date[]) => {
+    let earliestHour = 24
+    let latestHour = 0
+    
+    weekDates.forEach(date => {
+      const dateEvents = getEventsForDate(date)
+      dateEvents.forEach((event: CalendarEvent) => {
+        if (event.start.dateTime) {
+          const eventHour = new Date(event.start.dateTime).getHours()
+          earliestHour = Math.min(earliestHour, eventHour)
+          latestHour = Math.max(latestHour, eventHour)
+        }
+      })
+    })
+    
+    // If no events found, default to 8 AM - 6 PM
+    if (earliestHour === 24 && latestHour === 0) {
+      earliestHour = 8
+      latestHour = 18
+    }
+    
+    // Start 2 hours before earliest, end 3 hours after latest
+    const startHour = Math.max(0, earliestHour - 2)
+    const endHour = Math.min(23, latestHour + 3)
+    
+    return { startHour, endHour, totalHours: endHour - startHour + 1 }
+  }
+
   const renderCalendarView = () => {
     const weekDates = getWeekDates(startDate)
+    const { startHour, totalHours } = getTimeRangeForWeek(weekDates)
     
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -413,19 +442,23 @@ export default function CalendarPage() {
         <div className="grid grid-cols-8">
           {/* Time column */}
           <div className="border-r border-gray-200 dark:border-gray-700">
-            {Array.from({ length: 24 }, (_, hour) => (
-              <div key={hour} className="h-16 border-b border-gray-100 dark:border-gray-600 flex items-center justify-end pr-2">
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  {hour === 0 ? '12 AM' : hour === 12 ? '12 PM' : hour > 12 ? `${hour - 12} PM` : `${hour} AM`}
-                </span>
-              </div>
-            ))}
+            {Array.from({ length: totalHours }, (_, index) => {
+              const hour = startHour + index
+              return (
+                <div key={hour} className="h-16 border-b border-gray-100 dark:border-gray-600 flex items-center justify-end pr-2">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    {hour === 0 ? '12 AM' : hour === 12 ? '12 PM' : hour > 12 ? `${hour - 12} PM` : `${hour} AM`}
+                  </span>
+                </div>
+              )
+            })}
           </div>
 
           {/* Day columns */}
           {weekDates.map((date, dayIndex) => (
             <div key={dayIndex} className={`border-r border-gray-200 dark:border-gray-700 ${dayIndex === 6 ? 'border-r-0' : ''}`}>
-              {Array.from({ length: 24 }, (_, hour) => {
+              {Array.from({ length: totalHours }, (_, index) => {
+                const hour = startHour + index
                 const hourEvents = getEventsForDate(date).filter(event => {
                   if (!event.start.dateTime) return false
                   const eventHour = new Date(event.start.dateTime).getHours()
