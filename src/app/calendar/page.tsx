@@ -441,20 +441,16 @@ export default function CalendarPage() {
           // We'll use a simple nearest neighbor algorithm for now
           const optimizedOrder = await optimizeRouteOrder(eventsWithLocations, { lat: latitude, lng: longitude })
           
-          // Create waypoints from optimized locations
-          const waypoints = optimizedOrder.slice(0, -1).map((event: CalendarEvent) => 
+          // Create waypoints from all optimized locations
+          const waypoints = optimizedOrder.map((event: CalendarEvent) => 
             encodeURIComponent(event.location!)
           ).join('/')
-          
-          // Last location becomes the destination
-          const destination = encodeURIComponent(optimizedOrder[optimizedOrder.length - 1].location!)
           
           // Construct Google Maps URL with optimized route
           let mapsUrl = `https://www.google.com/maps/dir/${origin}/`
           if (waypoints) {
-            mapsUrl += `${waypoints}/`
+            mapsUrl += `${waypoints}`
           }
-          mapsUrl += destination
           
           window.open(mapsUrl, '_blank')
         },
@@ -580,20 +576,19 @@ export default function CalendarPage() {
     // First location as origin
     const origin = encodeURIComponent(optimizedOrder[0].location!)
     
-    // Create waypoints from remaining locations
-    const waypoints = optimizedOrder.slice(1, -1).map(event => 
+    // Create waypoints from all locations except the first (which is the origin)
+    const waypoints = optimizedOrder.slice(1).map(event => 
       encodeURIComponent(event.location!)
     ).join('/')
     
-    // Last location as destination
-    const destination = encodeURIComponent(optimizedOrder[optimizedOrder.length - 1].location!)
+    // For Google Maps, we don't need a separate destination when using waypoints
+    // The last waypoint becomes the destination automatically
     
     // Construct Google Maps URL with optimized route
     let mapsUrl = `https://www.google.com/maps/dir/${origin}/`
     if (waypoints) {
-      mapsUrl += `${waypoints}/`
+      mapsUrl += `${waypoints}`
     }
-    mapsUrl += destination
     
     window.open(mapsUrl, '_blank')
   }
