@@ -441,20 +441,16 @@ export default function CalendarPage() {
           // We'll use a simple nearest neighbor algorithm for now
           const optimizedOrder = await optimizeRouteOrder(eventsWithLocations, { lat: latitude, lng: longitude })
           
-                     // Create waypoints from all optimized locations except the last one
-           const waypoints = optimizedOrder.slice(0, -1).map((event: CalendarEvent) => 
-             encodeURIComponent(event.location!)
-           ).join('/')
-           
-           // Last location becomes the destination
-           const destination = encodeURIComponent(optimizedOrder[optimizedOrder.length - 1].location!)
-           
-           // Construct Google Maps URL with optimized route
-           let mapsUrl = `https://www.google.com/maps/dir/${origin}/`
-           if (waypoints) {
-             mapsUrl += `${waypoints}/`
-           }
-           mapsUrl += destination
+                               // Create waypoints from all optimized locations except the last one
+          const waypoints = optimizedOrder.slice(0, -1).map((event: CalendarEvent) => 
+            encodeURIComponent(event.location!)
+          ).join('/')
+          
+          // Last location becomes the destination
+          const destination = encodeURIComponent(optimizedOrder[optimizedOrder.length - 1].location!)
+          
+          // Construct Google Maps URL for multi-stop route (same as routeAllForDay)
+          const mapsUrl = `https://www.google.com/maps/dir/${origin}/${waypoints}/${destination}`
           
           window.open(mapsUrl, '_blank')
         },
@@ -580,20 +576,16 @@ export default function CalendarPage() {
     // First location as origin
     const origin = encodeURIComponent(optimizedOrder[0].location!)
     
-         // Create waypoints from all locations except the first and last
-     const waypoints = optimizedOrder.slice(1, -1).map(event => 
-       encodeURIComponent(event.location!)
-     ).join('/')
-     
-     // Last location becomes the destination
-     const destination = encodeURIComponent(optimizedOrder[optimizedOrder.length - 1].location!)
-     
-     // Construct Google Maps URL with optimized route
-     let mapsUrl = `https://www.google.com/maps/dir/${origin}/`
-     if (waypoints) {
-       mapsUrl += `${waypoints}/`
-     }
-     mapsUrl += destination
+             // Create waypoints from all locations except the first and last
+    const waypoints = optimizedOrder.slice(1, -1).map(event => 
+      encodeURIComponent(event.location!)
+    ).join('/')
+    
+    // Last location becomes the destination
+    const destination = encodeURIComponent(optimizedOrder[optimizedOrder.length - 1].location!)
+    
+    // Construct Google Maps URL for multi-stop route (same as routeAllWithoutLocation)
+    const mapsUrl = `https://www.google.com/maps/dir/${origin}/${waypoints}/${destination}`
     
     window.open(mapsUrl, '_blank')
   }
