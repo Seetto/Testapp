@@ -389,7 +389,7 @@ export default function CalendarPage() {
     if (sortedEvents.length === 1) {
       // Single location, just search for it
       const encodedLocation = encodeURIComponent(sortedEvents[0].location!)
-      const mapsUrl = `https://www.google.com/maps/search/${encodedLocation}`
+      const mapsUrl = `https://www.google.maps/search/${encodedLocation}`
       window.open(mapsUrl, '_blank')
       return
     }
@@ -406,11 +406,109 @@ export default function CalendarPage() {
     const destination = encodeURIComponent(sortedEvents[sortedEvents.length - 1].location!)
     
     // Construct Google Maps URL
-    let mapsUrl = `https://www.google.com/maps/dir/${origin}/`
+    let mapsUrl = `https://www.google.maps/dir/${origin}/`
     if (waypoints) {
       mapsUrl += `${waypoints}/`
     }
     mapsUrl += destination
+    
+    window.open(mapsUrl, '_blank')
+  }
+
+  const routeBestForDay = (dateEvents: CalendarEvent[]) => {
+    // Filter events that have locations
+    const eventsWithLocations = dateEvents.filter(event => event.location && event.location.trim() !== '')
+    
+    if (eventsWithLocations.length === 0) {
+      alert('No events with locations found for this day.')
+      return
+    }
+
+    if (eventsWithLocations.length === 1) {
+      // If only one location, just open regular directions
+      openGoogleMapsRoute(eventsWithLocations[0].location!)
+      return
+    }
+
+    // Get user's current location first
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords
+          const origin = `${latitude},${longitude}`
+          
+          // For best route, we'll use Google Maps' built-in optimization
+          // by adding all locations as waypoints and letting Google optimize the route
+          const allLocations = eventsWithLocations.map(event => 
+            encodeURIComponent(event.location!)
+          )
+          
+          // First location as destination, rest as waypoints
+          const destination = allLocations[0]
+          const waypoints = allLocations.slice(1).join('/')
+          
+          // Construct Google Maps URL with optimization
+          let mapsUrl = `https://www.google.maps/dir/${origin}/`
+          if (waypoints) {
+            mapsUrl += `${waypoints}/`
+          }
+          mapsUrl += destination
+          
+          // Add optimization parameter
+          mapsUrl += '?optimize=true'
+          
+          window.open(mapsUrl, '_blank')
+        },
+        (error) => {
+          console.error('Error getting location:', error)
+          // Fallback: create optimized route without current location
+          routeBestWithoutLocation(eventsWithLocations)
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 300000 // 5 minutes
+        }
+      )
+    } else {
+      // Geolocation not supported, create optimized route without current location
+      routeBestWithoutLocation(eventsWithLocations)
+    }
+  }
+
+  const routeBestWithoutLocation = (eventsWithLocations: CalendarEvent[]) => {
+    if (eventsWithLocations.length === 1) {
+      // Single location, just search for it
+      const encodedLocation = encodeURIComponent(eventsWithLocations[0].location!)
+      const mapsUrl = `https://www.google.maps/search/${encodedLocation}`
+      window.open(mapsUrl, '_blank')
+      return
+    }
+    
+    // For best route without current location, use first location as origin
+    // and let Google Maps optimize the rest
+    const allLocations = eventsWithLocations.map(event => 
+      encodeURIComponent(event.location!)
+    )
+    
+    // First location as origin
+    const origin = allLocations[0]
+    
+    // Create waypoints from remaining locations
+    const waypoints = allLocations.slice(1, -1).join('/')
+    
+    // Last location as destination
+    const destination = allLocations[allLocations.length - 1]
+    
+    // Construct Google Maps URL with optimization
+    let mapsUrl = `https://www.google.maps/dir/${origin}/`
+    if (waypoints) {
+      mapsUrl += `${waypoints}/`
+    }
+    mapsUrl += destination
+    
+    // Add optimization parameter
+    mapsUrl += '?optimize=true'
     
     window.open(mapsUrl, '_blank')
   }
@@ -901,12 +999,20 @@ export default function CalendarPage() {
                             day: 'numeric'
                           })}
                         </h2>
-                        <button
-                          onClick={() => routeAllForDay(dateEvents)}
-                          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
-                        >
-                          Route All
-                        </button>
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => routeAllForDay(dateEvents)}
+                            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                          >
+                            Route All
+                          </button>
+                          <button
+                            onClick={() => routeBestForDay(dateEvents)}
+                            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                          >
+                            Best Route
+                          </button>
+                        </div>
                       </div>
                     </div>
                     <div className="divide-y divide-gray-200 dark:divide-gray-700">
