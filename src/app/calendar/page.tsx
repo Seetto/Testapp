@@ -415,7 +415,7 @@ export default function CalendarPage() {
     window.open(mapsUrl, '_blank')
   }
 
-  const routeBestForDay = (dateEvents: CalendarEvent[]) => {
+  const routeBestForDay = async (dateEvents: CalendarEvent[]) => {
     // Filter events that have locations
     const eventsWithLocations = dateEvents.filter(event => event.location && event.location.trim() !== '')
     
@@ -433,29 +433,28 @@ export default function CalendarPage() {
     // Get user's current location first
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (position) => {
+        async (position) => {
           const { latitude, longitude } = position.coords
           const origin = `${latitude},${longitude}`
           
-          // For best route, we'll use Google Maps' built-in optimization
-          // by adding all locations as waypoints and letting Google optimize the route
-          const allLocations = eventsWithLocations.map(event => 
+          // For best route, we need to optimize the order of locations
+          // We'll use a simple nearest neighbor algorithm for now
+          const optimizedOrder = await optimizeRouteOrder(eventsWithLocations, { lat: latitude, lng: longitude })
+          
+          // Create waypoints from optimized locations
+          const waypoints = optimizedOrder.slice(0, -1).map((event: CalendarEvent) => 
             encodeURIComponent(event.location!)
-          )
+          ).join('/')
           
-          // First location as destination, rest as waypoints
-          const destination = allLocations[0]
-          const waypoints = allLocations.slice(1).join('/')
+          // Last location becomes the destination
+          const destination = encodeURIComponent(optimizedOrder[optimizedOrder.length - 1].location!)
           
-          // Construct Google Maps URL with optimization
+          // Construct Google Maps URL with optimized route
           let mapsUrl = `https://www.google.com/maps/dir/${origin}/`
           if (waypoints) {
             mapsUrl += `${waypoints}/`
           }
           mapsUrl += destination
-          
-          // Add optimization parameter
-          mapsUrl += '?optimize=true'
           
           window.open(mapsUrl, '_blank')
         },
@@ -476,7 +475,75 @@ export default function CalendarPage() {
     }
   }
 
-  const routeBestWithoutLocation = (eventsWithLocations: CalendarEvent[]) => {
+  // Helper function to calculate distance between two coordinates
+  const calculateDistance = (coord1: { lat: number; lng: number }, coord2: { lat: number; lng: number }) => {
+    const R = 6371 // Earth's radius in kilometers
+    const dLat = (coord2.lat - coord1.lat) * Math.PI / 180
+    const dLng = (coord2.lng - coord1.lng) * Math.PI / 180
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(coord1.lat * Math.PI / 180) * Math.cos(coord2.lat * Math.PI / 180) *
+              Math.sin(dLng/2) * Math.sin(dLng/2)
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+    return R * c
+  }
+
+  // Helper function to geocode an address (simplified - in real app you'd use a geocoding service)
+  const geocodeAddress = async (address: string): Promise<{ lat: number; lng: number } | null> => {
+    try {
+      // Use a simple geocoding service (you might want to use Google Geocoding API in production)
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`)
+      const data = await response.json()
+      if (data && data[0]) {
+        return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) }
+      }
+      return null
+    } catch (error) {
+      console.warn('Geocoding failed:', error)
+      return null
+    }
+  }
+
+  // Optimize route order using nearest neighbor algorithm
+  const optimizeRouteOrder = async (events: CalendarEvent[], startLocation: { lat: number; lng: number }) => {
+    if (events.length <= 1) return events
+
+    // Geocode all addresses
+    const eventsWithCoords = []
+    for (const event of events) {
+      const coords = await geocodeAddress(event.location!)
+      if (coords) {
+        eventsWithCoords.push({ ...event, coords })
+      }
+    }
+
+    if (eventsWithCoords.length === 0) return events
+
+    // Nearest neighbor algorithm
+    const unvisited = [...eventsWithCoords]
+    const route = []
+    let currentLocation = startLocation
+
+    while (unvisited.length > 0) {
+      let nearestIndex = 0
+      let nearestDistance = calculateDistance(currentLocation, unvisited[0].coords!)
+
+      for (let i = 1; i < unvisited.length; i++) {
+        const distance = calculateDistance(currentLocation, unvisited[i].coords!)
+        if (distance < nearestDistance) {
+          nearestDistance = distance
+          nearestIndex = i
+        }
+      }
+
+      route.push(unvisited[nearestIndex])
+      currentLocation = unvisited[nearestIndex].coords!
+      unvisited.splice(nearestIndex, 1)
+    }
+
+    return route
+  }
+
+  const routeBestWithoutLocation = async (eventsWithLocations: CalendarEvent[]) => {
     if (eventsWithLocations.length === 1) {
       // Single location, just search for it
       const encodedLocation = encodeURIComponent(eventsWithLocations[0].location!)
@@ -485,30 +552,48 @@ export default function CalendarPage() {
       return
     }
     
-    // For best route without current location, use first location as origin
-    // and let Google Maps optimize the rest
-    const allLocations = eventsWithLocations.map(event => 
-      encodeURIComponent(event.location!)
-    )
+    // For best route without current location, optimize the order
+    // Use the first location as starting point for optimization
+    const firstEvent = eventsWithLocations[0]
+    const firstCoords = await geocodeAddress(firstEvent.location!)
+    
+    if (!firstCoords) {
+      // Fallback to original order if geocoding fails
+      const origin = encodeURIComponent(eventsWithLocations[0].location!)
+      const waypoints = eventsWithLocations.slice(1, -1).map(event => 
+        encodeURIComponent(event.location!)
+      ).join('/')
+      const destination = encodeURIComponent(eventsWithLocations[eventsWithLocations.length - 1].location!)
+      
+      let mapsUrl = `https://www.google.com/maps/dir/${origin}/`
+      if (waypoints) {
+        mapsUrl += `${waypoints}/`
+      }
+      mapsUrl += destination
+      
+      window.open(mapsUrl, '_blank')
+      return
+    }
+
+    const optimizedOrder = await optimizeRouteOrder(eventsWithLocations, firstCoords)
     
     // First location as origin
-    const origin = allLocations[0]
+    const origin = encodeURIComponent(optimizedOrder[0].location!)
     
     // Create waypoints from remaining locations
-    const waypoints = allLocations.slice(1, -1).join('/')
+    const waypoints = optimizedOrder.slice(1, -1).map(event => 
+      encodeURIComponent(event.location!)
+    ).join('/')
     
     // Last location as destination
-    const destination = allLocations[allLocations.length - 1]
+    const destination = encodeURIComponent(optimizedOrder[optimizedOrder.length - 1].location!)
     
-    // Construct Google Maps URL with optimization
+    // Construct Google Maps URL with optimized route
     let mapsUrl = `https://www.google.com/maps/dir/${origin}/`
     if (waypoints) {
       mapsUrl += `${waypoints}/`
     }
     mapsUrl += destination
-    
-    // Add optimization parameter
-    mapsUrl += '?optimize=true'
     
     window.open(mapsUrl, '_blank')
   }
