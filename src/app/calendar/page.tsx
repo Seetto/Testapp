@@ -389,7 +389,7 @@ export default function CalendarPage() {
     if (sortedEvents.length === 1) {
       // Single location, just search for it
       const encodedLocation = encodeURIComponent(sortedEvents[0].location!)
-      const mapsUrl = `https://www.google.maps/search/${encodedLocation}`
+      const mapsUrl = `https://www.google.com/maps/search/${encodedLocation}`
       window.open(mapsUrl, '_blank')
       return
     }
@@ -406,7 +406,7 @@ export default function CalendarPage() {
     const destination = encodeURIComponent(sortedEvents[sortedEvents.length - 1].location!)
     
     // Construct Google Maps URL
-    let mapsUrl = `https://www.google.maps/dir/${origin}/`
+    let mapsUrl = `https://www.google.com/maps/dir/${origin}/`
     if (waypoints) {
       mapsUrl += `${waypoints}/`
     }
@@ -448,7 +448,7 @@ export default function CalendarPage() {
           const waypoints = allLocations.slice(1).join('/')
           
           // Construct Google Maps URL with optimization
-          let mapsUrl = `https://www.google.maps/dir/${origin}/`
+          let mapsUrl = `https://www.google.com/maps/dir/${origin}/`
           if (waypoints) {
             mapsUrl += `${waypoints}/`
           }
@@ -480,7 +480,7 @@ export default function CalendarPage() {
     if (eventsWithLocations.length === 1) {
       // Single location, just search for it
       const encodedLocation = encodeURIComponent(eventsWithLocations[0].location!)
-      const mapsUrl = `https://www.google.maps/search/${encodedLocation}`
+      const mapsUrl = `https://www.google.com/maps/search/${encodedLocation}`
       window.open(mapsUrl, '_blank')
       return
     }
@@ -501,7 +501,7 @@ export default function CalendarPage() {
     const destination = allLocations[allLocations.length - 1]
     
     // Construct Google Maps URL with optimization
-    let mapsUrl = `https://www.google.maps/dir/${origin}/`
+    let mapsUrl = `https://www.google.com/maps/dir/${origin}/`
     if (waypoints) {
       mapsUrl += `${waypoints}/`
     }
