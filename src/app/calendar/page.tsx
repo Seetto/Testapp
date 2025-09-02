@@ -437,17 +437,20 @@ export default function CalendarPage() {
           const { latitude, longitude } = position.coords
           const origin = `${latitude},${longitude}`
           
-          // For best route, we need to optimize the order of locations
+                    // For best route, we need to optimize the order of locations
           // We'll use a simple nearest neighbor algorithm for now
           const optimizedOrder = await optimizeRouteOrder(eventsWithLocations, { lat: latitude, lng: longitude })
           
-                               // Create waypoints from all optimized locations except the last one
-          const waypoints = optimizedOrder.slice(0, -1).map((event: CalendarEvent) => 
+          // Ensure we have all events (fallback to original if optimization failed)
+          const finalOrder = optimizedOrder.length === eventsWithLocations.length ? optimizedOrder : eventsWithLocations
+          
+          // Create waypoints from all optimized locations except the last one
+          const waypoints = finalOrder.slice(0, -1).map((event: CalendarEvent) => 
             encodeURIComponent(event.location!)
           ).join('/')
           
           // Last location becomes the destination
-          const destination = encodeURIComponent(optimizedOrder[optimizedOrder.length - 1].location!)
+          const destination = encodeURIComponent(finalOrder[finalOrder.length - 1].location!)
           
           // Construct Google Maps URL for multi-stop route (same as routeAllForDay)
           const mapsUrl = `https://www.google.com/maps/dir/${origin}/${waypoints}/${destination}`
@@ -505,16 +508,21 @@ export default function CalendarPage() {
 
     // Geocode all addresses
     const eventsWithCoords = []
+    const eventsWithoutCoords = []
+    
     for (const event of events) {
       const coords = await geocodeAddress(event.location!)
       if (coords) {
         eventsWithCoords.push({ ...event, coords })
+      } else {
+        eventsWithoutCoords.push(event)
       }
     }
 
+    // If we can't geocode any addresses, return original order
     if (eventsWithCoords.length === 0) return events
 
-    // Nearest neighbor algorithm
+    // Nearest neighbor algorithm for events with coordinates
     const unvisited = [...eventsWithCoords]
     const route = []
     let currentLocation = startLocation
@@ -535,6 +543,9 @@ export default function CalendarPage() {
       currentLocation = unvisited[nearestIndex].coords!
       unvisited.splice(nearestIndex, 1)
     }
+
+    // Add events that couldn't be geocoded at the end
+    route.push(...eventsWithoutCoords)
 
     return route
   }
@@ -571,18 +582,21 @@ export default function CalendarPage() {
       return
     }
 
-    const optimizedOrder = await optimizeRouteOrder(eventsWithLocations, firstCoords)
+        const optimizedOrder = await optimizeRouteOrder(eventsWithLocations, firstCoords)
+    
+    // Ensure we have all events (fallback to original if optimization failed)
+    const finalOrder = optimizedOrder.length === eventsWithLocations.length ? optimizedOrder : eventsWithLocations
     
     // First location as origin
-    const origin = encodeURIComponent(optimizedOrder[0].location!)
+    const origin = encodeURIComponent(finalOrder[0].location!)
     
-             // Create waypoints from all locations except the first and last
-    const waypoints = optimizedOrder.slice(1, -1).map(event => 
+    // Create waypoints from all locations except the first and last
+    const waypoints = finalOrder.slice(1, -1).map(event => 
       encodeURIComponent(event.location!)
     ).join('/')
     
     // Last location becomes the destination
-    const destination = encodeURIComponent(optimizedOrder[optimizedOrder.length - 1].location!)
+    const destination = encodeURIComponent(finalOrder[finalOrder.length - 1].location!)
     
     // Construct Google Maps URL for multi-stop route (same as routeAllWithoutLocation)
     const mapsUrl = `https://www.google.com/maps/dir/${origin}/${waypoints}/${destination}`
