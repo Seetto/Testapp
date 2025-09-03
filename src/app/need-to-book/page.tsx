@@ -382,45 +382,34 @@ export default function NeedToBookPage() {
     return { startHour, endHour, totalHours: endHour - startHour + 1 }
   }
 
-  const isNearbyJob = (event: CalendarEvent, date: Date) => {
+  const isNearbyJob = (event: CalendarEvent) => {
     if (!showNearbyJobs || !data) {
       return false
     }
     
-    // Use ISO date string (YYYY-MM-DD) for consistent comparison with API
-    const dateString = date.toISOString().split('T')[0]
-    
-    // Check if this event is a nearby job for ANY need-to-book event on this date
+    // Check if this event is a nearby job for ANY need-to-book event
     const result = Object.entries(data.nearbyJobsByDay).some(([dateKey, dayData]) => {
-      if (dateKey === dateString) {
-        const typedDayData = dayData as { needToBookEvent: CalendarEvent; nearbyJobs: Array<{ event: CalendarEvent; distance: number }> }
-        
-        // Check if this event is a nearby job for this day
-        const isNearby = typedDayData.nearbyJobs.some(({ event: nearbyEvent }) => nearbyEvent.id === event.id)
-        return isNearby
-      }
-      return false
+      const typedDayData = dayData as { needToBookEvent: CalendarEvent; nearbyJobs: Array<{ event: CalendarEvent; distance: number }> }
+      
+      // Check if this event is a nearby job for this day
+      const isNearby = typedDayData.nearbyJobs.some(({ event: nearbyEvent }) => nearbyEvent.id === event.id)
+      return isNearby
     })
     
     return result
   }
 
-  const getNearbyJobDistance = (event: CalendarEvent, date: Date) => {
+  const getNearbyJobDistance = (event: CalendarEvent) => {
     if (!showNearbyJobs || !data) {
       return 0
     }
     
-    // Use ISO date string (YYYY-MM-DD) for consistent comparison with API
-    const dateString = date.toISOString().split('T')[0]
-    
     // Find the distance for this nearby job
     for (const [dateKey, dayData] of Object.entries(data.nearbyJobsByDay)) {
-      if (dateKey === dateString) {
-        const typedDayData = dayData as { needToBookEvent: CalendarEvent; nearbyJobs: Array<{ event: CalendarEvent; distance: number }> }
-        const nearbyJob = typedDayData.nearbyJobs.find(({ event: nearbyEvent }) => nearbyEvent.id === event.id)
-        if (nearbyJob) {
-          return nearbyJob.distance
-        }
+      const typedDayData = dayData as { needToBookEvent: CalendarEvent; nearbyJobs: Array<{ event: CalendarEvent; distance: number }> }
+      const nearbyJob = typedDayData.nearbyJobs.find(({ event: nearbyEvent }) => nearbyEvent.id === event.id)
+      if (nearbyJob) {
+        return nearbyJob.distance
       }
     }
     return 0
