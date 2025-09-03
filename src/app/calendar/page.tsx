@@ -1070,11 +1070,29 @@ export default function CalendarPage() {
           </div>
         )}
 
-        {!loading && !error && events.length > 0 && (
-          <div className="space-y-6">
-            {viewMode === 'list' ? (
-              // List View (existing functionality)
-              sortedDateKeys.map(dateKey => {
+                 {!loading && !error && events.length > 0 && (
+           <div className="space-y-6">
+             {viewMode === 'list' ? (
+               <>
+                 {/* Calendar Color Key */}
+                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
+                   <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700">
+                     <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Calendar Colors</h3>
+                     <div className="flex flex-wrap items-center gap-4 text-xs">
+                       {Object.entries(calendarColors).map(([calendarId, color]) => (
+                         <div key={calendarId} className="flex items-center space-x-2">
+                           <div className="w-3 h-3 rounded" style={{ backgroundColor: color }}></div>
+                           <span className="text-gray-600 dark:text-gray-400">
+                             {calendarNames[calendarId] || (calendarId === 'primary' ? 'Primary' : calendarId)}
+                           </span>
+                         </div>
+                       ))}
+                     </div>
+                   </div>
+                 </div>
+                 
+                 {/* List View (existing functionality) */}
+                 {sortedDateKeys.map(dateKey => {
                 const date = new Date(dateKey)
                 const dateEvents = groupedEvents[dateKey]
                 
@@ -1201,16 +1219,17 @@ export default function CalendarPage() {
                         </div>
                       )
                     })}
-                    </div>
-                  </div>
-                )
-              })
-            ) : (
-              // Calendar View
-              renderCalendarView()
-            )}
-          </div>
-        )}
+                                         </div>
+                   </div>
+                 )
+               })}
+               </>
+             ) : (
+               // Calendar View
+               renderCalendarView()
+             )}
+           </div>
+         )}
       </div>
     </div>
   )
