@@ -141,7 +141,7 @@ export default function NeedToBookPage() {
         const calendarsData = await calendarsResponse.json()
         const colors: { [key: string]: string } = {}
         const calendarNames: { [key: string]: string } = {}
-        calendarsData.calendars?.forEach((calendar: any) => {
+        calendarsData.calendars?.forEach((calendar: { id: string; summary: string; backgroundColor?: string }) => {
           colors[calendar.id] = calendar.backgroundColor || '#4285f4'
           calendarNames[calendar.id] = calendar.summary
         })
@@ -561,8 +561,8 @@ export default function NeedToBookPage() {
                       const backgroundColor = isNeedToBook ? '#f97316' : (event.backgroundColor || '#4285f4')
                       
                       // Determine if this is a nearby job from need-to-book data
-                      const isNearbyJobEvent = isNearbyJob(event, date)
-                      const distance = getNearbyJobDistance(event, date)
+                      const isNearbyJobEvent = isNearbyJob(event)
+                      const distance = getNearbyJobDistance(event)
                       
                       // Add yellow border for nearby jobs
                       const borderStyle = isNearbyJobEvent ? '2px solid #f59e0b' : 'none'

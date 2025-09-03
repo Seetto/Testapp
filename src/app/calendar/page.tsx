@@ -654,7 +654,7 @@ export default function CalendarPage() {
     return eventsForDate
   }
 
-  const isNearbyJob = (event: CalendarEvent, date: Date) => {
+  const isNearbyJob = (event: CalendarEvent) => {
     if (!showNearbyJobs || !needToBookData || !selectedNeedToBookEvent) {
       return false
     }
@@ -682,7 +682,7 @@ export default function CalendarPage() {
     return isNearby
   }
 
-  const getNearbyJobDistance = (event: CalendarEvent, date: Date) => {
+  const getNearbyJobDistance = (event: CalendarEvent) => {
     if (!showNearbyJobs || !needToBookData || !selectedNeedToBookEvent) {
       return 0
     }
@@ -884,8 +884,8 @@ export default function CalendarPage() {
                       const height = Math.max(duration * 64, 20) // minimum height of 20px
 
                                              // Determine if this is a nearby job from need-to-book data
-                       const isNearbyJobEvent = isNearbyJob(event, date)
-                       const distance = getNearbyJobDistance(event, date)
+                       const isNearbyJobEvent = isNearbyJob(event)
+                       const distance = getNearbyJobDistance(event)
 
                       // Use original Google Calendar colors for all events, but highlight nearby jobs with yellow border
                       const backgroundColor = event.backgroundColor || '#4285f4'
@@ -1108,8 +1108,8 @@ export default function CalendarPage() {
                     </div>
                     <div className="divide-y divide-gray-200 dark:divide-gray-700">
                       {dateEvents.map(event => {
-                        const isNearbyJobEvent = isNearbyJob(event, date)
-                        const distance = getNearbyJobDistance(event, date)
+                        const isNearbyJobEvent = isNearbyJob(event)
+                        const distance = getNearbyJobDistance(event)
                         
                         return (
                                                      <div 
