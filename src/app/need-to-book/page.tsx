@@ -54,6 +54,8 @@ export default function NeedToBookPage() {
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar')
   const [showNearbyJobs, setShowNearbyJobs] = useState(true)
   const [selectedNeedToBookEvent, setSelectedNeedToBookEvent] = useState<string>('')
+  const [calendarColors, setCalendarColors] = useState<{ [key: string]: string }>({})
+  const [calendarNames, setCalendarNames] = useState<{ [key: string]: string }>({})
 
   const [startDate, setStartDate] = useState<string>(() => {
     const today = new Date()
@@ -132,9 +134,29 @@ export default function NeedToBookPage() {
     }
   }, [startDate, selectedCalendarId])
 
+  const fetchCalendarColors = async () => {
+    try {
+      const calendarsResponse = await fetch('/api/calendar/calendars')
+      if (calendarsResponse.ok) {
+        const calendarsData = await calendarsResponse.json()
+        const colors: { [key: string]: string } = {}
+        const calendarNames: { [key: string]: string } = {}
+        calendarsData.calendars?.forEach((calendar: any) => {
+          colors[calendar.id] = calendar.backgroundColor || '#4285f4'
+          calendarNames[calendar.id] = calendar.summary
+        })
+        setCalendarColors(colors)
+        setCalendarNames(calendarNames)
+      }
+    } catch (err) {
+      console.warn('Failed to fetch calendar colors:', err)
+    }
+  }
+
   useEffect(() => {
     if ((session as ExtendedSession)?.accessToken) {
       fetchNeedToBookEvents()
+      fetchCalendarColors()
     }
   }, [session, startDate, selectedCalendarId, fetchNeedToBookEvents])
 
@@ -415,6 +437,19 @@ export default function NeedToBookPage() {
         {/* Legend and Controls */}
         <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700">
           <div className="flex flex-col space-y-3">
+            {/* Calendar Color Key */}
+            <div className="flex items-center space-x-4 text-xs">
+              <span className="text-gray-600 dark:text-gray-400 font-medium">Calendar Colors:</span>
+              {Object.entries(calendarColors).map(([calendarId, color]) => (
+                <div key={calendarId} className="flex items-center space-x-2">
+                  <div className="w-3 h-3 rounded" style={{ backgroundColor: color }}></div>
+                  <span className="text-gray-600 dark:text-gray-400">
+                    {calendarNames[calendarId] || (calendarId === 'primary' ? 'Primary' : calendarId)}
+                  </span>
+                </div>
+              ))}
+            </div>
+            
             {/* Nearby Jobs Controls */}
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
@@ -682,6 +717,23 @@ export default function NeedToBookPage() {
           <div className="space-y-6">
             {viewMode === 'list' ? (
               <>
+                {/* Calendar Color Key */}
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
+                  <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700">
+                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Calendar Colors</h3>
+                    <div className="flex flex-wrap items-center gap-4 text-xs">
+                      {Object.entries(calendarColors).map(([calendarId, color]) => (
+                        <div key={calendarId} className="flex items-center space-x-2">
+                          <div className="w-3 h-3 rounded" style={{ backgroundColor: color }}></div>
+                          <span className="text-gray-600 dark:text-gray-400">
+                            {calendarNames[calendarId] || (calendarId === 'primary' ? 'Primary' : calendarId)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
                 {data.needToBookEvents.length > 0 && (
                   <div className="mb-8">
                     <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
